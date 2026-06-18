@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Thuso Health - Smart Queue & Clinic Booking</title>
+  
+  <!-- SEO Meta Tags -->
+  <meta name="description" content="Book nearby clinics, calculate distance, and reduce waiting times with Thuso Health. Real-time queue tracker and offline booking capability.">
+  <meta name="keywords" content="thuso health, clinic booking, queue management, distance tracker, offline medical app">
+  
+  <!-- Premium Typography & Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Custom Stylesheet -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  
+  <!-- Notification Toast Container -->
+  <div id="toast-container"></div>
+
+  <!-- Header Section -->
+  <header>
+    <div class="header-container">
+      <div class="logo">
+        <i class="fa-solid fa-heart-pulse logo-icon"></i>
+        <h1>Thuso<span>Health</span></h1>
+      </div>
+      
+      <!-- Network / Sync Status Indicator -->
+      <div class="status-panel">
+        <div id="connection-badge" class="badge online">
+          <span class="pulse-dot"></span>
+          <span id="connection-text">Online</span>
+        </div>
+        <button id="sync-btn" class="btn btn-icon btn-sync hidden" title="Sync Offline Bookings">
+          <i class="fa-solid fa-arrows-rotate"></i>
+          <span id="sync-count">0</span> Sync
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="main-content">
+    
+    <!-- User Settings / Location Mocking Panel -->
+    <section class="section location-bar card">
+      <div class="location-header">
+        <div class="title-with-icon">
+          <i class="fa-solid fa-location-crosshairs text-accent"></i>
+          <h2>Your Location</h2>
+        </div>
+        <span class="subtext">Simulate your position to see distance and travel time</span>
+      </div>
+      <div class="location-selectors">
+        <button class="btn btn-loc active" data-lat="-26.1929" data-lng="28.0328" data-name="Braamfontein">
+          <i class="fa-solid fa-building"></i> Braamfontein
+        </button>
+        <button class="btn btn-loc" data-lat="-26.1772" data-lng="28.0308" data-name="Parktown">
+          <i class="fa-solid fa-tree"></i> Parktown
+        </button>
+        <button class="btn btn-loc" data-lat="-26.1460" data-lng="28.0371" data-name="Rosebank">
+          <i class="fa-solid fa-store"></i> Rosebank
+        </button>
+        <button class="btn btn-loc" data-lat="-26.2041" data-lng="28.0473" data-name="JHB Central">
+          <i class="fa-solid fa-city"></i> JHB CBD
+        </button>
+      </div>
+    </section>
+
+    <!-- App Main Layout Grid -->
+    <div class="app-grid">
+      
+      <!-- Left Column: Clinics list -->
+      <section class="clinics-section">
+        <div class="section-title-container">
+          <h2>Nearby Clinics</h2>
+          <span class="badge badge-info"><span id="clinics-count">0</span> available</span>
+        </div>
+        
+        <!-- Search & Filter Controls -->
+        <div class="filter-controls card">
+          <div class="search-input-wrapper">
+            <i class="fa-solid fa-magnifying-glass search-icon"></i>
+            <input type="text" id="search-input" placeholder="Search clinics or services...">
+          </div>
+          <div class="sorting-controls">
+            <span>Sort by:</span>
+            <button id="sort-total" class="btn btn-sort active">Best Match (Total Time)</button>
+            <button id="sort-distance" class="btn btn-sort">Proximity</button>
+            <button id="sort-wait" class="btn btn-sort">Shortest Queue</button>
+          </div>
+        </div>
+
+        <!-- Clinics List Container -->
+        <div id="clinics-list" class="clinics-list-container">
+          <!-- Dynamically populated via JS -->
+          <div class="loading-state">
+            <i class="fa-solid fa-circle-notch fa-spin"></i>
+            <p>Loading nearby health clinics...</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Right Column: Queue Tracking & Bookings -->
+      <section class="queue-section">
+        
+        <!-- Live Queue / Active Booking panel -->
+        <div class="section-title-container">
+          <h2>Live Waiting Room</h2>
+        </div>
+        
+        <div id="active-booking-panel" class="card active-booking-card empty">
+          <!-- Dynamically populated -->
+          <div class="empty-state">
+            <i class="fa-solid fa-ticket-simple"></i>
+            <h3>No Active Queue Ticket</h3>
+            <p>Select a clinic from the list to book a slot and secure your ticket.</p>
+          </div>
+        </div>
+
+        <!-- History of Bookings -->
+        <div class="section-title-container margin-top">
+          <h2>My Bookings</h2>
+        </div>
+        <div class="card history-card">
+          <div id="bookings-history" class="history-list">
+            <!-- Dynamically populated -->
+            <div class="empty-history">
+              <p>No past bookings found.</p>
+            </div>
+          </div>
+        </div>
+
+      </section>
+
+    </div>
+  </main>
+
+  <!-- Booking Modal -->
+  <div id="booking-modal" class="modal">
+    <div class="modal-content glass">
+      <div class="modal-header">
+        <h2 id="modal-clinic-name">Book Clinic</h2>
+        <button class="modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="clinic-details-summary">
+          <p id="modal-clinic-address"><i class="fa-solid fa-location-dot"></i> Address</p>
+          <div class="metrics-grid">
+            <div class="metric">
+              <span class="label">Distance</span>
+              <span class="value" id="modal-clinic-distance">- km</span>
+            </div>
+            <div class="metric">
+              <span class="label">Travel Time</span>
+              <span class="value" id="modal-clinic-travel">- mins</span>
+            </div>
+            <div class="metric highlight">
+              <span class="label">Waiting Room Time</span>
+              <span class="value" id="modal-clinic-wait">- mins</span>
+            </div>
+          </div>
+        </div>
+
+        <form id="booking-form" class="booking-form">
+          <input type="hidden" id="booking-clinic-id">
+          
+          <div class="form-group">
+            <label for="booking-time"><i class="fa-regular fa-clock"></i> Select Arrival Time</label>
+            <select id="booking-time" required>
+              <option value="now">As soon as possible (Leave now)</option>
+              <option value="30">In 30 minutes</option>
+              <option value="60">In 1 hour</option>
+              <option value="120">In 2 hours</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="patient-name"><i class="fa-regular fa-user"></i> Patient Name</label>
+            <input type="text" id="patient-name" value="Paseka Moloi" required>
+          </div>
+
+          <div class="form-group">
+            <label for="patient-phone"><i class="fa-solid fa-phone"></i> Contact Phone</label>
+            <input type="text" id="patient-phone" value="+27 82 123 4567" required>
+          </div>
+
+          <div class="booking-advice">
+            <i class="fa-solid fa-circle-info"></i>
+            <p id="booking-advice-text">You should leave in 5 minutes to arrive on time.</p>
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-block">Confirm Booking & Join Queue</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <div class="footer-container">
+      <p>&copy; 2026 Thuso Health. Solving medical queues offline and online.</p>
+    </div>
+  </footer>
+
+  <!-- Application Logic -->
+  <script src="app.js"></script>
+</body>
+</html>

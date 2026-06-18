@@ -110,8 +110,8 @@
       "id": "b1",
       "userId": "u1",
       "clinicId": "c1",
-      "bookingTime": "2026-06-18T18:37:34.958Z",
-      "appointmentTime": "2026-06-18T21:37:34.958Z",
+      "bookingTime": "2026-06-18T19:00:57.711Z",
+      "appointmentTime": "2026-06-18T22:00:57.711Z",
       "status": "Confirmed",
       "queueNumber": "T-101",
       "estimatedWaitTime": 35
@@ -128,13 +128,13 @@
       "treatment_plan": "Bed rest and hydration",
       "medication_prescribed": "Paracetamol 500mg, Vitamin C",
       "file_url_r2": "https://r2.thuso.health/reports/u1-rec1.pdf",
-      "created_at": "2026-06-16T19:37:34.958Z"
+      "created_at": "2026-06-16T20:00:57.711Z"
     }
   ],
   "audit_logs": [
     {
       "log_id": 1,
-      "timestamp": "2026-06-16T19:37:34.958Z",
+      "timestamp": "2026-06-16T20:00:57.711Z",
       "practitioner_id": "u2",
       "practitioner_name": "Dr. Sarah Dube",
       "patient_id": "u1",

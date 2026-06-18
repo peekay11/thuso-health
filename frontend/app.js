@@ -2,8 +2,7 @@
 
 const CONFIG = {
   API_BASE: 'http://localhost:5000/api',
-  SERVER_PING_INTERVAL_MS: 5000,
-  DEFAULT_USER: { id: 'u1', name: 'Paseka Moloi', email: 'paseka@thuso.health' }
+  SERVER_PING_INTERVAL_MS: 5000
 };
 
 // Application State
@@ -18,14 +17,17 @@ const state = {
   bookings: [],
   activeBooking: null,
   
-  // Auth state for Healthcare Managers
+  // Auth: Patient
+  patientUser: null,  // { id, name, email, thuso_id_hash, consentPin, isAccessGranted, language }
+
+  // Auth: Healthcare Manager
   loggedInUser: null,
   loggedInClinic: null,
   
   // Offline sync queues
-  offlineQueue: [],        // Offline patient bookings
-  offlineQueueUpdates: [], // Offline queue status actions (check-ins, completions)
-  offlineClinicSettings: null, // Offline settings edits to sync
+  offlineQueue: [],
+  offlineQueueUpdates: [],
+  offlineClinicSettings: null,
   
   sortBy: 'totalTime'
 };
@@ -100,7 +102,6 @@ const MOCK_CLINICS = [
 
 // Initialize UI Elements
 document.addEventListener('DOMContentLoaded', () => {
-  // Load initial bookings from LocalStorage
   loadLocalState();
   initSyncButton();
   
@@ -108,6 +109,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const isHealthcarePortal = document.body.classList.contains('healthcare-portal');
 
   if (isPatientPortal) {
+    initPatientAuth(); // Auth gate — MUST come first
     initLocationSelector();
     initSortingControls();
     initSearchInput();
@@ -121,15 +123,12 @@ document.addEventListener('DOMContentLoaded', () => {
     initPractitionerPassport();
   }
   
-  // Initial health check and fetch
   checkConnection().then(() => {
     fetchClinics().then(() => {
-      if (isPatientPortal) {
-        renderClinicsList();
-      }
+      if (isPatientPortal && state.patientUser) renderClinicsList();
     });
     fetchBookings().then(() => {
-      if (isPatientPortal) {
+      if (isPatientPortal && state.patientUser) {
         updateActiveBookingUI();
         updateHistoryUI();
         fetchPatientPassport();
@@ -140,22 +139,19 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // Start polling to detect network transitions
   setInterval(() => {
     checkConnection().then(onlineChanged => {
       if (onlineChanged) {
         fetchClinics().then(() => {
-          if (isPatientPortal) renderClinicsList();
+          if (isPatientPortal && state.patientUser) renderClinicsList();
         });
         fetchBookings().then(() => {
-          if (isPatientPortal) {
+          if (isPatientPortal && state.patientUser) {
             updateActiveBookingUI();
             updateHistoryUI();
             fetchPatientPassport();
           }
-          if (isHealthcarePortal) {
-            updatePortalUI();
-          }
+          if (isHealthcarePortal) updatePortalUI();
         });
       }
     });
@@ -246,23 +242,27 @@ function loadLocalState() {
   const localUser = localStorage.getItem('thuso_provider_user');
   const localClinic = localStorage.getItem('thuso_provider_clinic');
   const localOfflineSettings = localStorage.getItem('thuso_offline_settings');
+  const localPatient = localStorage.getItem('thuso_patient_session');
   
   if (localHistory) state.bookings = JSON.parse(localHistory);
   if (localQueue) state.offlineQueue = JSON.parse(localQueue);
   if (localQueueUpdates) state.offlineQueueUpdates = JSON.parse(localQueueUpdates);
-  
   if (localClinics) {
     state.clinics = JSON.parse(localClinics);
   } else {
     state.clinics = JSON.parse(JSON.stringify(MOCK_CLINICS));
   }
-  
   if (localUser) state.loggedInUser = JSON.parse(localUser);
   if (localClinic) state.loggedInClinic = JSON.parse(localClinic);
   if (localOfflineSettings) state.offlineClinicSettings = JSON.parse(localOfflineSettings);
+  if (localPatient) state.patientUser = JSON.parse(localPatient);
   
-  // Set active patient booking
-  const active = state.bookings.find(b => b.status === 'Confirmed' || b.status === 'CheckedIn');
+  // Set active booking scoped to logged-in patient
+  const uid = state.patientUser ? state.patientUser.id : null;
+  const active = state.bookings.find(b =>
+    (uid ? b.userId === uid : true) &&
+    (b.status === 'Confirmed' || b.status === 'CheckedIn')
+  );
   state.activeBooking = active || null;
 }
 
@@ -272,6 +272,12 @@ function saveLocalState() {
   localStorage.setItem('thuso_offline_updates', JSON.stringify(state.offlineQueueUpdates));
   localStorage.setItem('thuso_clinics', JSON.stringify(state.clinics));
   localStorage.setItem('thuso_offline_settings', JSON.stringify(state.offlineClinicSettings));
+  
+  if (state.patientUser) {
+    localStorage.setItem('thuso_patient_session', JSON.stringify(state.patientUser));
+  } else {
+    localStorage.removeItem('thuso_patient_session');
+  }
   
   if (state.loggedInUser) {
     localStorage.setItem('thuso_provider_user', JSON.stringify(state.loggedInUser));
@@ -739,7 +745,7 @@ async function fetchBookings() {
         state.bookings = data.bookings;
         
         // Update active patient booking
-        const active = state.bookings.find(b => b.userId === CONFIG.DEFAULT_USER.id && (b.status === 'Confirmed' || b.status === 'CheckedIn'));
+        const active = state.bookings.find(b => b.userId === state.patientUser ? state.patientUser.id : 'u1' && (b.status === 'Confirmed' || b.status === 'CheckedIn'));
         state.activeBooking = active || null;
         
         saveLocalState();
@@ -1013,7 +1019,7 @@ function updateActiveBookingUI() {
   
   // Find current user's active booking
   const booking = state.bookings.find(b => 
-    b.userId === CONFIG.DEFAULT_USER.id && 
+    b.userId === state.patientUser ? state.patientUser.id : 'u1' && 
     (b.status === 'Confirmed' || b.status === 'CheckedIn')
   );
 
@@ -1078,7 +1084,7 @@ function updateHistoryUI() {
   if (!container) return;
   
   // Filter for patients bookings
-  const patientBookings = state.bookings.filter(b => b.userId === CONFIG.DEFAULT_USER.id);
+  const patientBookings = state.bookings.filter(b => b.userId === state.patientUser ? state.patientUser.id : 'u1');
 
   if (patientBookings.length === 0) {
     container.innerHTML = `
@@ -1188,7 +1194,7 @@ function initModal() {
     modal.style.display = 'none';
     
     // Check if patient already has active ticket
-    const active = state.bookings.find(b => b.userId === CONFIG.DEFAULT_USER.id && (b.status === 'Confirmed' || b.status === 'CheckedIn'));
+    const active = state.bookings.find(b => b.userId === state.patientUser ? state.patientUser.id : 'u1' && (b.status === 'Confirmed' || b.status === 'CheckedIn'));
     if (active) {
       showToast("You already have an active ticket. Please cancel or complete it first.", "warning");
       return;
@@ -1208,7 +1214,7 @@ async function createPatientBooking(clinicId, appointmentTime) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userId: CONFIG.DEFAULT_USER.id,
+          userId: state.patientUser ? state.patientUser.id : 'u1',
           clinicId,
           appointmentTime
         })
@@ -1235,8 +1241,8 @@ async function createPatientBooking(clinicId, appointmentTime) {
   const count = state.bookings.filter(b => b.clinicId === clinicId).length + 101;
   const offlineBooking = {
     id: `off-${Date.now()}`,
-    userId: CONFIG.DEFAULT_USER.id,
-    patientName: CONFIG.DEFAULT_USER.name,
+    userId: state.patientUser ? state.patientUser.id : 'u1',
+    patientName: state.patientUser ? state.patientUser.name : 'Patient',
     patientPhone: '+27 82 123 4567',
     clinicId,
     bookingTime: new Date().toISOString(),
@@ -1351,6 +1357,171 @@ function formatTime(isoString) {
 }
 
 // ----------------------------------------------------
+// PATIENT AUTHENTICATION (LOGIN / REGISTER)
+// ----------------------------------------------------
+
+function switchPatientTab(tab) {
+  const loginForm = document.getElementById('pt-login-form');
+  const registerForm = document.getElementById('pt-register-form');
+  const loginBtn = document.getElementById('pt-tab-login');
+  const registerBtn = document.getElementById('pt-tab-register');
+  if (!loginForm) return;
+  if (tab === 'login') {
+    loginForm.classList.remove('hidden');
+    registerForm.classList.add('hidden');
+    loginBtn.className = 'btn btn-primary';
+    registerBtn.className = 'btn btn-sort';
+  } else {
+    loginForm.classList.add('hidden');
+    registerForm.classList.remove('hidden');
+    registerBtn.className = 'btn btn-primary';
+    loginBtn.className = 'btn btn-sort';
+  }
+}
+
+function onPatientLoggedIn(user) {
+  state.patientUser = user;
+  saveLocalState();
+
+  // Close the auth modal
+  const modal = document.getElementById('patient-auth-modal');
+  if (modal) modal.style.display = 'none';
+
+  // Show greeting and sign-out button
+  const greeting = document.getElementById('patient-greeting');
+  const greetingName = document.getElementById('patient-greeting-name');
+  const logoutBtn = document.getElementById('btn-patient-logout');
+  if (greeting) { greeting.style.display = 'inline-flex'; greetingName.innerText = user.name; }
+  if (logoutBtn) logoutBtn.style.display = 'inline-flex';
+
+  // Now load everything
+  checkConnection().then(() => {
+    fetchClinics().then(() => renderClinicsList());
+    fetchBookings().then(() => {
+      updateActiveBookingUI();
+      updateHistoryUI();
+      fetchPatientPassport();
+    });
+  });
+}
+
+function initPatientAuth() {
+  const modal = document.getElementById('patient-auth-modal');
+  if (!modal) return;
+
+  // If already logged in, just restore session
+  if (state.patientUser) {
+    modal.style.display = 'none';
+    const greeting = document.getElementById('patient-greeting');
+    const greetingName = document.getElementById('patient-greeting-name');
+    const logoutBtn = document.getElementById('btn-patient-logout');
+    if (greeting) { greeting.style.display = 'inline-flex'; greetingName.innerText = state.patientUser.name; }
+    if (logoutBtn) logoutBtn.style.display = 'inline-flex';
+    return;
+  }
+
+  // Login form
+  const loginForm = document.getElementById('pt-login-form');
+  if (loginForm) {
+    loginForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('pt-login-email').value.trim();
+      const password = document.getElementById('pt-login-password').value;
+
+      if (state.isOnline) {
+        try {
+          const res = await fetch(`${CONFIG.API_BASE}/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password })
+          });
+          const data = await res.json();
+          if (data.success && data.user.role === 'patient') {
+            onPatientLoggedIn(data.user);
+            showToast(`Welcome back, ${data.user.name}!`, 'success');
+          } else if (data.success && data.user.role !== 'patient') {
+            showToast('Healthcare providers must use the Providers Portal.', 'warning');
+          } else {
+            showToast(data.message || 'Invalid credentials.', 'error');
+          }
+        } catch (err) {
+          // Offline fallback — allow seeded patient
+          if (email === 'paseka@thuso.health' && password === 'password123') {
+            onPatientLoggedIn({
+              id: 'u1', name: 'Paseka Moloi', email: 'paseka@thuso.health',
+              role: 'patient', thuso_id_hash: 'TH-U1', consentPin: '1234',
+              isAccessGranted: true, language: 'en'
+            });
+            showToast('Signed in offline (demo patient).', 'warning');
+          } else {
+            showToast('Cannot authenticate while offline.', 'error');
+          }
+        }
+      } else {
+        if (email === 'paseka@thuso.health' && password === 'password123') {
+          onPatientLoggedIn({
+            id: 'u1', name: 'Paseka Moloi', email: 'paseka@thuso.health',
+            role: 'patient', thuso_id_hash: 'TH-U1', consentPin: '1234',
+            isAccessGranted: true, language: 'en'
+          });
+          showToast('Signed in offline (demo patient).', 'warning');
+        } else {
+          showToast('Cannot authenticate while offline.', 'error');
+        }
+      }
+    });
+  }
+
+  // Register form
+  const registerForm = document.getElementById('pt-register-form');
+  if (registerForm) {
+    registerForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = document.getElementById('pt-reg-name').value.trim();
+      const email = document.getElementById('pt-reg-email').value.trim();
+      const phone = document.getElementById('pt-reg-phone').value.trim();
+      const password = document.getElementById('pt-reg-password').value;
+
+      if (!state.isOnline) {
+        showToast('Registration requires an internet connection.', 'error');
+        return;
+      }
+
+      try {
+        const res = await fetch(`${CONFIG.API_BASE}/auth/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, email, phone, password, role: 'patient' })
+        });
+        const data = await res.json();
+        if (data.success) {
+          onPatientLoggedIn(data.user);
+          showToast(`Account created! Welcome, ${data.user.name}. Your ThusoID is ${data.user.thuso_id_hash}`, 'success');
+        } else {
+          showToast(data.message || 'Registration failed.', 'error');
+        }
+      } catch (err) {
+        showToast('Registration error. Please try again.', 'error');
+      }
+    });
+  }
+
+  // Sign-out button
+  const logoutBtn = document.getElementById('btn-patient-logout');
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', () => {
+      state.patientUser = null;
+      state.bookings = [];
+      state.activeBooking = null;
+      saveLocalState();
+      localStorage.removeItem('thuso_patient_records');
+      // Reload the page to show the login modal again
+      window.location.reload();
+    });
+  }
+}
+
+// ----------------------------------------------------
 // DIGITAL HEALTH PASSPORT & CONSENT (PATIENT SIDE)
 // ----------------------------------------------------
 
@@ -1361,6 +1532,8 @@ function initPatientPassport() {
   const langSelect = document.getElementById('passport-lang-select');
   const toggleLogsBtn = document.getElementById('toggle-audit-logs');
   const downloadBtn = document.getElementById('download-passport-btn');
+  const notifyMeds = document.getElementById('notify-meds');
+  const notifyAppts = document.getElementById('notify-appointments');
 
   if (consentToggle) {
     consentToggle.addEventListener('change', async () => {
@@ -1373,11 +1546,24 @@ function initPatientPassport() {
     langSelect.addEventListener('change', async () => {
       currentLanguage = langSelect.value;
       await updatePatientConsentSettings({ language: currentLanguage });
-      // Reload timeline with translations
       const cached = localStorage.getItem('thuso_patient_records');
       if (cached) {
         renderPatientTimeline(JSON.parse(cached));
       }
+    });
+  }
+
+  if (notifyMeds) {
+    notifyMeds.addEventListener('change', async () => {
+      await updatePatientConsentSettings({ notifyMedications: notifyMeds.checked });
+      showToast(notifyMeds.checked ? 'Medication reminders enabled.' : 'Medication reminders disabled.', 'info');
+    });
+  }
+
+  if (notifyAppts) {
+    notifyAppts.addEventListener('change', async () => {
+      await updatePatientConsentSettings({ notifyAppointments: notifyAppts.checked });
+      showToast(notifyAppts.checked ? 'Appointment alerts enabled.' : 'Appointment alerts disabled.', 'info');
     });
   }
 
@@ -1403,9 +1589,14 @@ function initPatientPassport() {
 }
 
 async function fetchPatientPassport() {
-  const patientId = CONFIG.DEFAULT_USER.id;
+  if (!state.patientUser) return;
+  const patientId = state.patientUser.id;
   
-  // 1. Fetch Consent Settings
+  // Pre-populate from session (instant, no API call needed for basics)
+  document.getElementById('passport-patient-name').innerText = state.patientUser.name;
+  document.getElementById('passport-thuso-id').innerText = state.patientUser.thuso_id_hash || `TH-${patientId.toUpperCase()}`;
+
+  // 1. Fetch/Sync Consent Settings from server
   if (state.isOnline) {
     try {
       const consentRes = await fetch(`${CONFIG.API_BASE}/patients/${patientId}/consent`);
@@ -1414,8 +1605,21 @@ async function fetchPatientPassport() {
         updateConsentUI(consentData.consent);
       }
     } catch (err) {
-      console.warn("Could not fetch consent from server, using local fallback");
+      console.warn('Could not fetch consent from server, using session fallback');
+      updateConsentUI({
+        consentPin: state.patientUser.consentPin,
+        isAccessGranted: state.patientUser.isAccessGranted,
+        thuso_id_hash: state.patientUser.thuso_id_hash,
+        language: state.patientUser.language
+      });
     }
+  } else {
+    updateConsentUI({
+      consentPin: state.patientUser.consentPin,
+      isAccessGranted: state.patientUser.isAccessGranted,
+      thuso_id_hash: state.patientUser.thuso_id_hash,
+      language: state.patientUser.language
+    });
   }
 
   // 2. Fetch Medical Records
@@ -1429,30 +1633,13 @@ async function fetchPatientPassport() {
         localStorage.setItem('thuso_patient_records', JSON.stringify(records));
       }
     } catch (err) {
-      console.warn("Could not fetch records from server, checking local cache");
+      console.warn('Could not fetch records from server, checking local cache');
     }
   }
 
   if (records.length === 0) {
     const cached = localStorage.getItem('thuso_patient_records');
-    if (cached) {
-      records = JSON.parse(cached);
-    } else {
-      // Seed fallback mock medical record for offline
-      records = [{
-        record_id: 1,
-        patient_id: "u1",
-        doctor_id: "u2",
-        doctor_name: "Dr. Sarah Dube",
-        clinic_name: "Parktown Medical Centre",
-        diagnosis: "Mild respiratory infection",
-        treatment_plan: "Bed rest and hydration",
-        medication_prescribed: "Paracetamol 500mg, Vitamin C",
-        file_url_r2: "https://r2.thuso.health/reports/u1-rec1.pdf",
-        created_at: new Date(Date.now() - 86400000 * 2).toISOString()
-      }];
-      localStorage.setItem('thuso_patient_records', JSON.stringify(records));
-    }
+    if (cached) records = JSON.parse(cached);
   }
 
   renderPatientTimeline(records);
@@ -1463,6 +1650,7 @@ function updateConsentUI(consent) {
   const pinDisplay = document.getElementById('consent-pin-code');
   const langSelect = document.getElementById('passport-lang-select');
   const thusoIdDisplay = document.getElementById('passport-thuso-id');
+  const patientNameDisplay = document.getElementById('passport-patient-name');
 
   if (consentToggle) consentToggle.checked = consent.isAccessGranted;
   if (pinDisplay) pinDisplay.innerText = consent.consentPin;
@@ -1473,10 +1661,37 @@ function updateConsentUI(consent) {
   if (thusoIdDisplay && consent.thuso_id_hash) {
     thusoIdDisplay.innerText = consent.thuso_id_hash;
   }
+  if (patientNameDisplay && state.patientUser) {
+    patientNameDisplay.innerText = state.patientUser.name;
+  }
+
+  // Generate real QR code
+  generatePassportQR(consent);
+}
+
+function generatePassportQR(consent) {
+  const qrContainer = document.getElementById('passport-qr-canvas');
+  if (!qrContainer) return;
+  // Clear previous
+  qrContainer.innerHTML = '';
+  const thusoId = (consent && consent.thuso_id_hash) || (state.patientUser ? `TH-${state.patientUser.id.toUpperCase()}` : 'TH-UNKNOWN');
+  const qrData = `${window.location.origin}/healthcare.html?scan=1&id=${state.patientUser ? state.patientUser.id : 'u1'}&thusoId=${thusoId}`;
+  if (typeof QRCode !== 'undefined') {
+    new QRCode(qrContainer, {
+      text: qrData,
+      width: 64,
+      height: 64,
+      colorDark: '#1e293b',
+      colorLight: '#ffffff',
+      correctLevel: QRCode.CorrectLevel.M
+    });
+  } else {
+    qrContainer.innerHTML = '<i class="fa-solid fa-qrcode" style="font-size:2.5rem;color:#64748b;"></i>';
+  }
 }
 
 async function updatePatientConsentSettings(payload) {
-  const patientId = CONFIG.DEFAULT_USER.id;
+  const patientId = state.patientUser ? state.patientUser.id : 'u1';
   if (state.isOnline) {
     try {
       const response = await fetch(`${CONFIG.API_BASE}/patients/${patientId}/consent`, {
@@ -1593,7 +1808,7 @@ async function fetchAndRenderAuditLogs() {
   const container = document.getElementById('audit-logs-list');
   if (!container) return;
 
-  const patientId = CONFIG.DEFAULT_USER.id;
+  const patientId = state.patientUser ? state.patientUser.id : 'u1';
   let logs = [];
 
   if (state.isOnline) {
@@ -1630,43 +1845,112 @@ async function fetchAndRenderAuditLogs() {
 function downloadHealthPassportPDF() {
   const cached = localStorage.getItem('thuso_patient_records');
   const records = cached ? JSON.parse(cached) : [];
-  
-  if (records.length === 0) {
-    showToast("No medical history available to download.", "warning");
+  const patient = state.patientUser;
+
+  if (!patient) {
+    showToast('Please sign in first.', 'error');
     return;
   }
 
-  // Generate simple text-based formatted document
-  let docContent = `THUSO HEALTH PASSPORT - MEDICAL REPORT\n`;
-  docContent += `==========================================\n`;
-  docContent += `Patient Name: Paseka Moloi\n`;
-  docContent += `Thuso ID: TH-u1\n`;
-  docContent += `Generated At: ${new Date().toLocaleString()}\n`;
-  docContent += `==========================================\n\n`;
+  // Use jsPDF if available
+  if (typeof window.jspdf !== 'undefined' || typeof window.jsPDF !== 'undefined') {
+    const { jsPDF } = window.jspdf || window;
+    const doc = new jsPDF({ unit: 'mm', format: 'a4' });
 
-  records.forEach((r, i) => {
-    docContent += `CONSULTATION SUMMARY #${i+1}\n`;
-    docContent += `Date: ${new Date(r.created_at).toLocaleDateString()}\n`;
-    docContent += `Practitioner: ${r.doctor_name}\n`;
-    docContent += `Facility: ${r.clinic_name}\n`;
-    docContent += `Diagnosis: ${r.diagnosis}\n`;
-    docContent += `Treatment Plan: ${r.treatment_plan || 'N/A'}\n`;
-    docContent += `Prescription: ${r.medication_prescribed || 'N/A'}\n`;
-    docContent += `File Link: ${r.file_url_r2 || 'N/A'}\n`;
-    docContent += `------------------------------------------\n\n`;
-  });
+    // Header
+    doc.setFillColor(30, 41, 59);  // #1e293b
+    doc.rect(0, 0, 210, 28, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text('THUSO HEALTH', 14, 12);
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Digital Health Passport', 14, 19);
+    doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 24);
 
-  const blob = new Blob([docContent], { type: 'text/plain;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = `thuso-health-passport-u1.txt`;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
-  
-  showToast("Health Passport downloaded successfully! (Data-free offline storage saved)", "success");
+    // Patient info block
+    doc.setTextColor(30, 41, 59);
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text('PATIENT PROFILE', 14, 38);
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Name: ${patient.name}`, 14, 45);
+    doc.text(`Email: ${patient.email}`, 14, 51);
+    doc.text(`ThusoID: ${patient.thuso_id_hash || `TH-${patient.id.toUpperCase()}`}`, 14, 57);
+    doc.text(`POPIA Access: ${patient.isAccessGranted ? 'Enabled' : 'Disabled'}`, 14, 63);
+
+    // Divider
+    doc.setDrawColor(203, 213, 225);
+    doc.line(14, 68, 196, 68);
+
+    let y = 75;
+    if (records.length === 0) {
+      doc.setFontSize(10);
+      doc.setTextColor(100, 116, 139);
+      doc.text('No medical records on file.', 14, y);
+    } else {
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(30, 41, 59);
+      doc.text('MEDICAL HISTORY', 14, y);
+      y += 8;
+
+      records.forEach((r, i) => {
+        if (y > 260) { doc.addPage(); y = 20; }
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(30, 41, 59);
+        doc.text(`[${i + 1}] ${new Date(r.created_at).toLocaleDateString()} — ${r.doctor_name} (${r.clinic_name})`, 14, y);
+        y += 5;
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(51, 65, 85);
+        const diagLines = doc.splitTextToSize(`Diagnosis: ${r.diagnosis}`, 180);
+        doc.text(diagLines, 14, y); y += diagLines.length * 4;
+        if (r.treatment_plan) {
+          const planLines = doc.splitTextToSize(`Treatment: ${r.treatment_plan}`, 180);
+          doc.text(planLines, 14, y); y += planLines.length * 4;
+        }
+        if (r.medication_prescribed) {
+          const medLines = doc.splitTextToSize(`Prescription: ${r.medication_prescribed}`, 180);
+          doc.text(medLines, 14, y); y += medLines.length * 4;
+        }
+        doc.setDrawColor(226, 232, 240);
+        doc.line(14, y + 1, 196, y + 1);
+        y += 7;
+      });
+    }
+
+    // Footer
+    doc.setFontSize(7);
+    doc.setTextColor(148, 163, 184);
+    doc.text('Thuso Health — POPIA Compliant Medical Record. Do not share without patient consent.', 14, 285);
+
+    const filename = `thuso-passport-${patient.thuso_id_hash || patient.id}-${Date.now()}.pdf`;
+    doc.save(filename);
+    showToast('Health Passport PDF downloaded successfully!', 'success');
+  } else {
+    // Fallback plain text if jsPDF not loaded
+    let txt = `THUSO HEALTH PASSPORT\nPatient: ${patient.name}\nThusoID: ${patient.thuso_id_hash}\nGenerated: ${new Date().toLocaleString()}\n\n`;
+    records.forEach((r, i) => {
+      txt += `[${i+1}] ${new Date(r.created_at).toLocaleDateString()} | ${r.doctor_name} (${r.clinic_name})\n`;
+      txt += `Diagnosis: ${r.diagnosis}\n`;
+      if (r.treatment_plan) txt += `Treatment: ${r.treatment_plan}\n`;
+      if (r.medication_prescribed) txt += `Prescription: ${r.medication_prescribed}\n`;
+      txt += '\n';
+    });
+    const blob = new Blob([txt], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `thuso-passport-${patient.id}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    showToast('Health Passport downloaded (text fallback).', 'warning');
+  }
 }
 
 // ----------------------------------------------------
@@ -1679,8 +1963,23 @@ function initPractitionerPassport() {
   const lookupBtn = document.getElementById('btn-lookup-passport');
   const consultForm = document.getElementById('consultation-form');
 
+  // Auto-fill from QR code scan URL params
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get('scan') === '1' && urlParams.get('id')) {
+    const pidInput = document.getElementById('lookup-patient-id');
+    if (pidInput) pidInput.value = urlParams.get('id');
+    // Clean URL without reload
+    window.history.replaceState({}, '', window.location.pathname);
+  }
+
   if (lookupBtn) {
     lookupBtn.addEventListener('click', async () => {
+      // GUARD: must be logged in
+      if (!state.loggedInUser) {
+        showToast('Please log in to look up patient records.', 'error');
+        return;
+      }
+
       const patientInput = document.getElementById('lookup-patient-id').value.trim();
       const pin = document.getElementById('lookup-patient-pin').value.trim();
       const errorContainer = document.getElementById('lookup-error-container');
@@ -1690,69 +1989,70 @@ function initPractitionerPassport() {
       resultsContainer.classList.add('hidden');
 
       if (!patientInput) {
-        showToast("Please enter a valid Patient ID", "warning");
+        showToast('Please enter a valid Patient ID or email', 'warning');
         return;
       }
 
-      // Convert email to patient id if needed
-      let patientId = patientInput;
-      if (patientInput.includes('@')) {
-        patientId = 'u1'; // Mock translation of email to patient ID for Paseka Moloi
-      }
+      // Email or ID lookup
+      let patientId = patientInput.includes('@') ? null : patientInput;
 
       if (!state.isOnline) {
-        // Offline Mock Access Check
-        if (patientId === 'u1' && pin === '1234') {
-          currentLookupPatientId = 'u1';
-          renderPractitionerRecordsList([{
-            record_id: 1,
-            patient_id: "u1",
-            doctor_name: "Dr. Sarah Dube",
-            clinic_name: "Parktown Medical Centre",
-            diagnosis: "Mild respiratory infection",
-            treatment_plan: "Bed rest and hydration",
-            medication_prescribed: "Paracetamol 500mg, Vitamin C",
-            created_at: new Date(Date.now() - 86400000 * 2).toISOString()
-          }]);
-          
-          document.getElementById('practitioner-patient-name').innerText = 'Paseka Moloi';
-          document.getElementById('practitioner-thuso-id').innerText = 'TH-u1';
-          resultsContainer.classList.remove('hidden');
-          showToast("Access granted offline (Validated via PIN)", "warning");
-        } else {
-          errorContainer.innerText = "Offline Lookup Error: PIN verification requires online connection or exact match.";
-          errorContainer.classList.remove('hidden');
-        }
+        errorContainer.innerText = 'Patient lookup requires an online connection.';
+        errorContainer.classList.remove('hidden');
         return;
       }
 
-      // Online lookup
+      // Online lookup — resolve email to user ID first if needed
       try {
+        // If email provided, resolve to patient ID and name via API
+        let resolvedId = patientId;
+        let resolvedName = null;
+        if (!resolvedId) {
+          const findRes = await fetch(`${CONFIG.API_BASE}/users/find-by-email?email=${encodeURIComponent(patientInput)}`);
+          const findData = await findRes.json();
+          if (findData.success) {
+            resolvedId = findData.patient.id;
+            resolvedName = findData.patient.name;
+          } else {
+            errorContainer.innerText = 'No patient found with that email address.';
+            errorContainer.classList.remove('hidden');
+            return;
+          }
+        }
+
         const queryParams = new URLSearchParams({ doctorId: state.loggedInUser.id });
         if (pin) queryParams.append('pin', pin);
 
-        const response = await fetch(`${CONFIG.API_BASE}/patients/${patientId}/records?${queryParams.toString()}`);
+        const response = await fetch(`${CONFIG.API_BASE}/patients/${resolvedId}/records?${queryParams.toString()}`);
         const data = await response.json();
 
         if (data.success) {
-          currentLookupPatientId = patientId;
+          currentLookupPatientId = resolvedId;
           
-          // Fetch patient profile to show name
-          const consentRes = await fetch(`${CONFIG.API_BASE}/patients/${patientId}/consent`);
+          // Get patient name and ThusoID
+          const consentRes = await fetch(`${CONFIG.API_BASE}/patients/${resolvedId}/consent`);
           const consentData = await consentRes.json();
+          const thusoId = (consentData.success && consentData.consent.thuso_id_hash) ? consentData.consent.thuso_id_hash : `TH-${resolvedId.toUpperCase()}`;
+
+          // Try to get name from find-by-email result, or find-by-email now
+          if (!resolvedName) {
+            const nameRes = await fetch(`${CONFIG.API_BASE}/users/find-by-email?email=${encodeURIComponent('')}`).catch(() => null);
+            // Name unknown without email — show ID and ThusoID
+            resolvedName = `Patient ${thusoId}`;
+          }
           
-          document.getElementById('practitioner-patient-name').innerText = patientId === 'u1' ? 'Paseka Moloi' : 'Patient Name';
-          document.getElementById('practitioner-thuso-id').innerText = (consentData.success && consentData.consent.thuso_id_hash) ? consentData.consent.thuso_id_hash : `TH-${patientId}`;
+          document.getElementById('practitioner-patient-name').innerText = resolvedName;
+          document.getElementById('practitioner-thuso-id').innerText = thusoId;
           
           renderPractitionerRecordsList(data.records);
           resultsContainer.classList.remove('hidden');
-          showToast("Authorized Passport access granted.", "success");
+          showToast('Authorized Passport access granted.', 'success');
         } else {
-          errorContainer.innerText = data.error || "Access Denied: Patient PIN or consent required.";
+          errorContainer.innerText = data.error || 'Access Denied: Patient PIN or consent required.';
           errorContainer.classList.remove('hidden');
         }
       } catch (err) {
-        errorContainer.innerText = "Error looking up patient medical history from server.";
+        errorContainer.innerText = 'Error looking up patient medical history from server.';
         errorContainer.classList.remove('hidden');
       }
     });

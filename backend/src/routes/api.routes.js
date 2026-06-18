@@ -14,6 +14,7 @@ router.post('/auth/register', AuthController.register);
 
 // User Routes
 router.get('/users/profile', UserController.getProfile);
+router.get('/users/find-by-email', UserController.findByEmail);
 router.post('/users/register', UserController.register);
 router.post('/users/login', UserController.login);
 

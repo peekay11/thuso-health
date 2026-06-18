@@ -1,5 +1,6 @@
 const MedicalRecordModel = require('../models/medicalRecord.model');
 const UserModel = require('../models/user.model');
+const ClinicModel = require('../models/clinic.model');
 
 class MedicalRecordController {
   static async getPatientRecords(req, res) {
@@ -76,15 +77,22 @@ class MedicalRecordController {
         return res.status(404).json({ success: false, error: 'Patient not found' });
       }
 
+      // Resolve the real clinic name
+      let clinicName = 'Local Health Practitioner';
+      if (doctor.clinicId) {
+        const clinic = ClinicModel.findById(doctor.clinicId);
+        if (clinic) clinicName = clinic.name;
+      }
+
       const newRecord = MedicalRecordModel.create({
         patient_id: patientId,
         doctor_id: doctorId,
         doctor_name: doctor.name,
-        clinic_name: doctor.clinicId ? 'Clinic' : 'Local Health Practitioner',
+        clinic_name: clinicName,
         diagnosis,
         treatment_plan,
         medication_prescribed,
-        file_url_r2: file_url_r2 || `https://r2.thuso.health/reports/u1-r${Date.now()}.pdf`
+        file_url_r2: file_url_r2 || null
       });
 
       // Write POPIA audit log

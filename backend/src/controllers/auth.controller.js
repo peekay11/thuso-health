@@ -26,7 +26,11 @@ class AuthController {
           name: user.name,
           email: user.email,
           role: user.role,
-          clinicId: user.clinicId
+          clinicId: user.clinicId,
+          thuso_id_hash: user.thuso_id_hash || `TH-${user.id.toUpperCase()}`,
+          consentPin: user.consentPin || '1234',
+          isAccessGranted: user.isAccessGranted !== false,
+          language: user.language || 'en'
         },
         clinic
       });
@@ -96,7 +100,11 @@ class AuthController {
           name: newUser.name,
           email: newUser.email,
           role: newUser.role,
-          clinicId: newUser.clinicId
+          clinicId: newUser.clinicId,
+          thuso_id_hash: newUser.thuso_id_hash,
+          consentPin: newUser.consentPin,
+          isAccessGranted: newUser.isAccessGranted,
+          language: newUser.language
         }
       });
     } catch (error) {

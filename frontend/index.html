@@ -16,11 +16,68 @@
   
   <!-- Custom Stylesheet -->
   <link rel="stylesheet" href="style.css">
+  <!-- QR Code Library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <!-- jsPDF Library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body class="patient-portal">
   
   <!-- Notification Toast Container -->
   <div id="toast-container"></div>
+
+  <!-- ===== PATIENT AUTH MODAL ===== -->
+  <div id="patient-auth-modal" class="modal" style="display:flex;">
+    <div class="modal-content" style="max-width:420px;">
+      <div class="modal-header">
+        <h2 id="patient-auth-title">Sign In to Thuso Health</h2>
+      </div>
+      <div class="modal-body">
+        <!-- Auth Tab Switcher -->
+        <div class="auth-tabs" style="display:flex;gap:0.5rem;margin-bottom:1.25rem;">
+          <button id="pt-tab-login" class="btn btn-primary" style="flex:1;" onclick="switchPatientTab('login')">Sign In</button>
+          <button id="pt-tab-register" class="btn btn-sort" style="flex:1;" onclick="switchPatientTab('register')">Create Account</button>
+        </div>
+
+        <!-- Login Form -->
+        <form id="pt-login-form">
+          <div class="form-group">
+            <label for="pt-login-email"><i class="fa-regular fa-envelope"></i> Email Address</label>
+            <input type="email" id="pt-login-email" placeholder="you@example.com" required>
+          </div>
+          <div class="form-group">
+            <label for="pt-login-password"><i class="fa-solid fa-lock"></i> Password</label>
+            <input type="password" id="pt-login-password" placeholder="Your password" required>
+          </div>
+          <button type="submit" class="btn btn-primary btn-block">Sign In</button>
+          <p style="font-size:0.75rem;color:var(--text-muted);text-align:center;margin-top:0.75rem;">
+            Demo: <strong>paseka@thuso.health</strong> / <strong>password123</strong>
+          </p>
+        </form>
+
+        <!-- Register Form -->
+        <form id="pt-register-form" class="hidden">
+          <div class="form-group">
+            <label for="pt-reg-name"><i class="fa-regular fa-user"></i> Full Name</label>
+            <input type="text" id="pt-reg-name" placeholder="Thabo Nkosi" required>
+          </div>
+          <div class="form-group">
+            <label for="pt-reg-email"><i class="fa-regular fa-envelope"></i> Email Address</label>
+            <input type="email" id="pt-reg-email" placeholder="thabo@example.com" required>
+          </div>
+          <div class="form-group">
+            <label for="pt-reg-phone"><i class="fa-solid fa-phone"></i> Phone Number</label>
+            <input type="tel" id="pt-reg-phone" placeholder="+27 82 000 0000">
+          </div>
+          <div class="form-group">
+            <label for="pt-reg-password"><i class="fa-solid fa-lock"></i> Create Password</label>
+            <input type="password" id="pt-reg-password" placeholder="Min 6 characters" required>
+          </div>
+          <button type="submit" class="btn btn-primary btn-block">Create My Health Account</button>
+        </form>
+      </div>
+    </div>
+  </div>
 
   <!-- Header Section -->
   <header>
@@ -30,7 +87,13 @@
       </div>
       
       <div class="nav-links">
-        <a href="healthcare.html" class="nav-link"><i class="fa-solid fa-user-doctor"></i> Healthcare Providers Portal &rarr;</a>
+        <span id="patient-greeting" style="font-size:0.8rem;font-weight:600;color:var(--text-main);display:none;">
+          <i class="fa-solid fa-circle-user"></i> <span id="patient-greeting-name"></span>
+        </span>
+        <a href="healthcare.html" class="nav-link"><i class="fa-solid fa-user-doctor"></i> Healthcare Providers &rarr;</a>
+        <button id="btn-patient-logout" class="btn btn-cancel" style="font-size:0.75rem;padding:0.3rem 0.6rem;display:none;" title="Sign out">
+          <i class="fa-solid fa-right-from-bracket"></i> Sign Out
+        </button>
       </div>
       
       <!-- Network Status Badge -->
@@ -141,14 +204,12 @@
           <div class="passport-header-flex">
             <div class="passport-details">
               <span class="passport-badge"><i class="fa-solid fa-passport"></i> Health Passport</span>
-              <h3 id="passport-patient-name">Paseka Moloi</h3>
-              <p>ThusoID: <span id="passport-thuso-id" class="passport-id">TH-u1</span></p>
+              <h3 id="passport-patient-name">Loading...</h3>
+              <p>ThusoID: <span id="passport-thuso-id" class="passport-id">—</span></p>
             </div>
             <div class="passport-qr-container">
-              <div class="passport-qr-mock">
-                <i class="fa-solid fa-qrcode" style="font-size: 3rem; color: var(--text-main);"></i>
-              </div>
-              <span style="font-size: 0.65rem; color: var(--text-muted); font-weight: 600;">Scan QR Code</span>
+              <div id="passport-qr-canvas" class="passport-qr-mock"></div>
+              <span style="font-size: 0.65rem; color: var(--text-muted); font-weight: 600;">Scan to Share</span>
             </div>
           </div>
 

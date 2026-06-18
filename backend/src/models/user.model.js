@@ -18,14 +18,20 @@ class UserModel {
   }
 
   static create(userData) {
+    const userId = `u${db.users.length + 1}`;
     const newUser = {
-      id: `u${db.users.length + 1}`,
+      id: userId,
       name: userData.name,
       email: userData.email,
-      phone: userData.phone || "",
-      role: userData.role || "patient",
+      phone: userData.phone || '',
+      role: userData.role || 'patient',
       clinicId: userData.clinicId || null,
-      password: userData.password || "password123" // Simplified password storage for MVP
+      password: userData.password || 'password123',
+      // Passport & POPIA fields (patient only)
+      thuso_id_hash: `TH-${userId.toUpperCase()}`,
+      consentPin: Math.floor(1000 + Math.random() * 9000).toString(), // 4-digit PIN
+      isAccessGranted: true,
+      language: 'en'
     };
     db.users.push(newUser);
     saveDb();

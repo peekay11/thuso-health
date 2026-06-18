@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const apiRoutes = require('./routes/api.routes');
 const bookingRoutes = require('./routes/bookingRoutes');
+const { errorHandler } = require('./middleware/errorHandler');
 
 const app = express();
 
@@ -33,14 +34,7 @@ app.use((req, res, next) => {
   });
 });
 
-// Error handling middleware
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({
-    success: false,
-    message: "Internal Server Error",
-    error: err.message
-  });
-});
+// Global error-handling middleware (must be LAST — 4-argument signature)
+app.use(errorHandler);
 
 module.exports = app;

@@ -106,8 +106,8 @@
       "id": "b1",
       "userId": "u1",
       "clinicId": "c1",
-      "bookingTime": "2026-06-18T17:27:33.999Z",
-      "appointmentTime": "2026-06-18T20:27:33.999Z",
+      "bookingTime": "2026-06-18T17:34:50.410Z",
+      "appointmentTime": "2026-06-18T20:34:50.410Z",
       "status": "Confirmed",
       "queueNumber": "T-101",
       "estimatedWaitTime": 35

@@ -111,6 +111,26 @@
       "status": "Confirmed",
       "queueNumber": "T-101",
       "estimatedWaitTime": 35
+    },
+    {
+      "id": "b2",
+      "userId": "u1",
+      "clinicId": "c3",
+      "bookingTime": "2026-06-18T17:00:13.849Z",
+      "appointmentTime": "2026-06-18T17:00:13.844Z",
+      "status": "Completed",
+      "queueNumber": "C3-101",
+      "estimatedWaitTime": 50
+    },
+    {
+      "id": "b3",
+      "userId": "u1",
+      "clinicId": "c3",
+      "bookingTime": "2026-06-18T17:08:05.299Z",
+      "appointmentTime": "2026-06-18T17:38:05.295Z",
+      "status": "Completed",
+      "queueNumber": "C3-102",
+      "estimatedWaitTime": 50
     }
   ]
 }

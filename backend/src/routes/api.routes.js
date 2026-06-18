@@ -13,6 +13,7 @@ router.post('/auth/register', AuthController.register);
 // User Routes
 router.get('/users/profile', UserController.getProfile);
 router.post('/users/register', UserController.register);
+router.post('/users/login', UserController.login);
 
 // Clinic Routes
 router.get('/clinics', ClinicController.getAllClinics);

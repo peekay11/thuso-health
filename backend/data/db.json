@@ -25,7 +25,7 @@
       "lat": -26.1929,
       "lng": 28.0328,
       "baseWaitTimeMinutes": 45,
-      "currentQueueCount": 11,
+      "currentQueueCount": 12,
       "services": [
         "General Practitioner",
         "Dentistry",
@@ -69,11 +69,13 @@
       "baseWaitTimeMinutes": 20,
       "currentQueueCount": 3,
       "services": [
-        "General Practitioner"
+        "General Practitioner",
+        "Physiotherapy",
+        "Optometry"
       ],
       "operatingHours": "08:00 - 18:00",
       "capacityPerDay": 40,
-      "hasElectricity": false,
+      "hasElectricity": true,
       "hasSolar": true,
       "openTime": "08:00",
       "closeTime": "18:00"
@@ -104,21 +106,11 @@
       "id": "b1",
       "userId": "u1",
       "clinicId": "c1",
-      "bookingTime": "2026-06-18T15:43:07.820Z",
-      "appointmentTime": "2026-06-18T18:43:07.820Z",
-      "status": "Cancelled",
+      "bookingTime": "2026-06-18T16:27:19.203Z",
+      "appointmentTime": "2026-06-18T19:27:19.203Z",
+      "status": "Confirmed",
       "queueNumber": "T-101",
       "estimatedWaitTime": 35
-    },
-    {
-      "id": "b2",
-      "userId": "u1",
-      "clinicId": "c3",
-      "bookingTime": "2026-06-18T17:00:13.849Z",
-      "appointmentTime": "2026-06-18T17:00:13.844Z",
-      "status": "Completed",
-      "queueNumber": "C3-101",
-      "estimatedWaitTime": 50
     }
   ]
 }

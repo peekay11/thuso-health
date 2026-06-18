@@ -1,32 +1,48 @@
-const UserModel = require('../models/user.model');
+const UserService = require('../services/userService');
 
 class UserController {
-  static getProfile(req, res) {
+  static async getProfile(req, res) {
     try {
-      const user = UserModel.findById("u1"); // Using default seed user for simplicity
-      if (!user) {
-        return res.status(404).json({ success: false, message: "User not found" });
+      const authHeader = req.headers.authorization;
+      if (!authHeader) {
+        return res.status(401).json({ error: 'Unauthorized' });
       }
-      return res.status(200).json({ success: true, user });
+      
+      const user = await UserService.getUserById('user-123');
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+      return res.status(200).json(user);
     } catch (error) {
-      return res.status(500).json({ success: false, message: error.message });
+      return res.status(500).json({ error: error.message });
     }
   }
 
-  static register(req, res) {
+  static async register(req, res) {
     try {
-      const { name, email, phone } = req.body;
+      const { name, email, password } = req.body;
       if (!name || !email) {
-        return res.status(400).json({ success: false, message: "Name and email are required" });
+        return res.status(400).json({ error: 'Name and email are required' });
       }
-      const existing = UserModel.findByEmail(email);
-      if (existing) {
-        return res.status(200).json({ success: true, user: existing, message: "User already exists, logged in" });
-      }
-      const newUser = UserModel.create({ name, email, phone });
-      return res.status(201).json({ success: true, user: newUser });
+      
+      const newUser = await UserService.registerUser({ name, email, password });
+      return res.status(201).json(newUser);
     } catch (error) {
-      return res.status(500).json({ success: false, message: error.message });
+      return res.status(500).json({ error: error.message });
+    }
+  }
+
+  static async login(req, res) {
+    try {
+      const { email, password } = req.body;
+      if (!email || !password) {
+        return res.status(400).json({ error: 'Email and password are required' });
+      }
+      
+      const result = await UserService.loginUser({ email, password });
+      return res.status(200).json(result);
+    } catch (error) {
+      return res.status(401).json({ error: error.message });
     }
   }
 }

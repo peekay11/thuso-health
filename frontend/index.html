@@ -6,19 +6,18 @@
   <title>Thuso Health - Smart Queue & Clinic Booking</title>
   
   <!-- SEO Meta Tags -->
-  <meta name="description" content="Book nearby clinics, calculate distance, and reduce waiting times with Thuso Health. Real-time queue tracker and offline booking capability.">
-  <meta name="keywords" content="thuso health, clinic booking, queue management, distance tracker, offline medical app">
+  <meta name="description" content="Book nearby clinics, calculate distance, and manage real-time queues. Offline-resilient healthcare system with electricity and solar status tracking.">
   
   <!-- Premium Typography & Icons -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   
   <!-- Custom Stylesheet -->
   <link rel="stylesheet" href="style.css">
 </head>
-<body>
+<body class="patient-portal">
   
   <!-- Notification Toast Container -->
   <div id="toast-container"></div>
@@ -31,13 +30,17 @@
         <h1>Thuso<span>Health</span></h1>
       </div>
       
-      <!-- Network / Sync Status Indicator -->
+      <div class="nav-links">
+        <a href="healthcare.html" class="nav-link"><i class="fa-solid fa-user-doctor"></i> Healthcare Providers Portal &rarr;</a>
+      </div>
+      
+      <!-- Network Status Badge -->
       <div class="status-panel">
         <div id="connection-badge" class="badge online">
           <span class="pulse-dot"></span>
           <span id="connection-text">Online</span>
         </div>
-        <button id="sync-btn" class="btn btn-icon btn-sync hidden" title="Sync Offline Bookings">
+        <button id="sync-btn" class="btn btn-icon btn-sync hidden" title="Sync Offline Operations">
           <i class="fa-solid fa-arrows-rotate"></i>
           <span id="sync-count">0</span> Sync
         </button>
@@ -47,103 +50,94 @@
 
   <main class="main-content">
     
-    <!-- User Settings / Location Mocking Panel -->
+    <!-- User Simulated Location Bar -->
     <section class="section location-bar card">
       <div class="location-header">
         <div class="title-with-icon">
           <i class="fa-solid fa-location-crosshairs text-accent"></i>
-          <h2>Your Location</h2>
+          <h2>Your Simulated Location</h2>
         </div>
-        <span class="subtext">Simulate your position to see distance and travel time</span>
+        <span class="subtext">Update your position to compute travel times and rank clinics dynamically</span>
       </div>
       <div class="location-selectors">
         <button class="btn btn-loc active" data-lat="-26.1929" data-lng="28.0328" data-name="Braamfontein">
-          <i class="fa-solid fa-building"></i> Braamfontein
+          Braamfontein
         </button>
         <button class="btn btn-loc" data-lat="-26.1772" data-lng="28.0308" data-name="Parktown">
-          <i class="fa-solid fa-tree"></i> Parktown
+          Parktown
         </button>
         <button class="btn btn-loc" data-lat="-26.1460" data-lng="28.0371" data-name="Rosebank">
-          <i class="fa-solid fa-store"></i> Rosebank
+          Rosebank
         </button>
         <button class="btn btn-loc" data-lat="-26.2041" data-lng="28.0473" data-name="JHB Central">
-          <i class="fa-solid fa-city"></i> JHB CBD
+          JHB CBD
         </button>
       </div>
     </section>
 
-    <!-- App Main Layout Grid -->
+    <!-- Main Columns Grid -->
     <div class="app-grid">
       
-      <!-- Left Column: Clinics list -->
+      <!-- Left: Clinic Proximity List -->
       <section class="clinics-section">
         <div class="section-title-container">
-          <h2>Nearby Clinics</h2>
-          <span class="badge badge-info"><span id="clinics-count">0</span> available</span>
+          <h2>Nearby Health Clinics</h2>
+          <span class="badge badge-info"><span id="clinics-count">0</span> matching</span>
         </div>
         
-        <!-- Search & Filter Controls -->
         <div class="filter-controls card">
           <div class="search-input-wrapper">
             <i class="fa-solid fa-magnifying-glass search-icon"></i>
-            <input type="text" id="search-input" placeholder="Search clinics or services...">
+            <input type="text" id="search-input" placeholder="Search clinics by name or service...">
           </div>
           <div class="sorting-controls">
-            <span>Sort by:</span>
-            <button id="sort-total" class="btn btn-sort active">Best Match (Total Time)</button>
+            <span>Sort:</span>
+            <button id="sort-total" class="btn btn-sort active">Best Match (Travel + Queue)</button>
             <button id="sort-distance" class="btn btn-sort">Proximity</button>
-            <button id="sort-wait" class="btn btn-sort">Shortest Queue</button>
+            <button id="sort-wait" class="btn btn-sort">Shortest Wait</button>
           </div>
         </div>
 
-        <!-- Clinics List Container -->
         <div id="clinics-list" class="clinics-list-container">
-          <!-- Dynamically populated via JS -->
           <div class="loading-state">
             <i class="fa-solid fa-circle-notch fa-spin"></i>
-            <p>Loading nearby health clinics...</p>
+            <p>Fetching clinics...</p>
           </div>
         </div>
       </section>
 
-      <!-- Right Column: Queue Tracking & Bookings -->
+      <!-- Right: Active Booking & Queue Ticket -->
       <section class="queue-section">
-        
-        <!-- Live Queue / Active Booking panel -->
         <div class="section-title-container">
-          <h2>Live Waiting Room</h2>
+          <h2>Your Active Queue Ticket</h2>
         </div>
         
         <div id="active-booking-panel" class="card active-booking-card empty">
-          <!-- Dynamically populated -->
           <div class="empty-state">
             <i class="fa-solid fa-ticket-simple"></i>
-            <h3>No Active Queue Ticket</h3>
-            <p>Select a clinic from the list to book a slot and secure your ticket.</p>
+            <h3>No Ticket Active</h3>
+            <p>Please select a clinic on the left, check power status/wait time, and reserve your slot.</p>
           </div>
         </div>
 
-        <!-- History of Bookings -->
         <div class="section-title-container margin-top">
-          <h2>My Bookings</h2>
+          <h2>Recent Bookings</h2>
         </div>
         <div class="card history-card">
           <div id="bookings-history" class="history-list">
-            <!-- Dynamically populated -->
             <div class="empty-history">
-              <p>No past bookings found.</p>
+              <p>No recent bookings.</p>
             </div>
           </div>
         </div>
-
       </section>
-
+      
     </div>
   </main>
 
   <!-- Booking Modal -->
   <div id="booking-modal" class="modal">
-    <div class="modal-content glass">
+    <div class="modal-content">
       <div class="modal-header">
         <h2 id="modal-clinic-name">Book Clinic</h2>
         <button class="modal-close">&times;</button>
@@ -161,7 +155,7 @@
               <span class="value" id="modal-clinic-travel">- mins</span>
             </div>
             <div class="metric highlight">
-              <span class="label">Waiting Room Time</span>
+              <span class="label">Wait Room Time</span>
               <span class="value" id="modal-clinic-wait">- mins</span>
             </div>
           </div>

@@ -38,10 +38,6 @@ class ClinicController {
     }
   }
 
-  /**
-   * Searches and ranks clinics based on user's current location coordinates.
-   * Path parameters or query parameters: lat, lng
-   */
   static getNearbyClinics(req, res) {
     try {
       const { lat, lng } = req.query;
@@ -60,6 +56,21 @@ class ClinicController {
       );
 
       return res.status(200).json({ success: true, clinics: recommendations });
+    } catch (error) {
+      return res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
+  static updateClinic(req, res) {
+    try {
+      const { id } = req.params;
+      const clinic = ClinicModel.findById(id);
+      if (!clinic) {
+        return res.status(404).json({ success: false, message: "Clinic not found" });
+      }
+
+      const updatedClinic = ClinicModel.updateClinicDetails(id, req.body);
+      return res.status(200).json({ success: true, clinic: updatedClinic });
     } catch (error) {
       return res.status(500).json({ success: false, message: error.message });
     }

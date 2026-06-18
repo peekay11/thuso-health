@@ -4,6 +4,11 @@ const router = express.Router();
 const UserController = require('../controllers/user.controller');
 const ClinicController = require('../controllers/clinic.controller');
 const BookingController = require('../controllers/booking.controller');
+const AuthController = require('../controllers/auth.controller');
+
+// Auth Routes
+router.post('/auth/login', AuthController.login);
+router.post('/auth/register', AuthController.register);
 
 // User Routes
 router.get('/users/profile', UserController.getProfile);
@@ -13,6 +18,7 @@ router.post('/users/register', UserController.register);
 router.get('/clinics', ClinicController.getAllClinics);
 router.get('/clinics/nearby', ClinicController.getNearbyClinics);
 router.get('/clinics/:id', ClinicController.getClinicById);
+router.put('/clinics/:id', ClinicController.updateClinic);
 
 // Booking Routes
 router.get('/bookings', BookingController.getBookings);

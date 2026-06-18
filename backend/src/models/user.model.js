@@ -1,4 +1,4 @@
-const { db } = require('./db');
+const { db, saveDb } = require('./db');
 
 class UserModel {
   static getAll() {
@@ -13,14 +13,22 @@ class UserModel {
     return db.users.find(u => u.email.toLowerCase() === email.toLowerCase());
   }
 
+  static findByClinicId(clinicId) {
+    return db.users.find(u => u.clinicId === clinicId);
+  }
+
   static create(userData) {
     const newUser = {
       id: `u${db.users.length + 1}`,
       name: userData.name,
       email: userData.email,
-      phone: userData.phone || ""
+      phone: userData.phone || "",
+      role: userData.role || "patient",
+      clinicId: userData.clinicId || null,
+      password: userData.password || "password123" // Simplified password storage for MVP
     };
     db.users.push(newUser);
+    saveDb();
     return newUser;
   }
 }

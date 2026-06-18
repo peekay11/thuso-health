@@ -1,4 +1,4 @@
-const { db } = require('./db');
+const { db, saveDb } = require('./db');
 
 class BookingModel {
   static getAll() {
@@ -24,15 +24,16 @@ class BookingModel {
     
     const newBooking = {
       id: `b${db.bookings.length + 1}`,
-      userId: bookingData.userId || "u1", // fallback to default user
+      userId: bookingData.userId || "u1",
       clinicId: bookingData.clinicId,
       bookingTime: new Date().toISOString(),
-      appointmentTime: bookingData.appointmentTime || new Date(Date.now() + 3600000).toISOString(), // defaults to 1 hour from now
+      appointmentTime: bookingData.appointmentTime || new Date(Date.now() + 3600000).toISOString(),
       status: "Confirmed",
       queueNumber: `${queuePrefix}-${queueNum}`,
       estimatedWaitTime: parseInt(bookingData.estimatedWaitTime || 30, 10)
     };
     db.bookings.push(newBooking);
+    saveDb();
     return newBooking;
   }
 
@@ -40,6 +41,7 @@ class BookingModel {
     const booking = this.findById(id);
     if (booking) {
       booking.status = status;
+      saveDb();
       return booking;
     }
     return null;

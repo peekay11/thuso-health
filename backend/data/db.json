@@ -1,0 +1,124 @@
+{
+  "users": [
+    {
+      "id": "u1",
+      "name": "Paseka Moloi",
+      "email": "paseka@thuso.health",
+      "phone": "+27 82 123 4567",
+      "role": "patient"
+    },
+    {
+      "id": "u2",
+      "name": "Dr. Sarah Dube",
+      "email": "sarah@thuso.health",
+      "phone": "+27 83 987 6543",
+      "role": "healthcare",
+      "clinicId": "c3",
+      "password": "password123"
+    }
+  ],
+  "clinics": [
+    {
+      "id": "c1",
+      "name": "Thuso Health Central Clinic",
+      "address": "26 Jorissen St, Braamfontein, Johannesburg, 2001",
+      "lat": -26.1929,
+      "lng": 28.0328,
+      "baseWaitTimeMinutes": 45,
+      "currentQueueCount": 11,
+      "services": [
+        "General Practitioner",
+        "Dentistry",
+        "Pediatrics",
+        "Vaccinations"
+      ],
+      "operatingHours": "08:00 - 17:00",
+      "capacityPerDay": 80,
+      "hasElectricity": true,
+      "hasSolar": false,
+      "openTime": "08:00",
+      "closeTime": "17:00"
+    },
+    {
+      "id": "c2",
+      "name": "Hillbrow Community Health Centre",
+      "address": "Smith St & Klein St, Hillbrow, Johannesburg, 2001",
+      "lat": -26.1884,
+      "lng": 28.0443,
+      "baseWaitTimeMinutes": 90,
+      "currentQueueCount": 28,
+      "services": [
+        "General Practitioner",
+        "HIV/AIDS Care",
+        "Maternity",
+        "Pharmacy"
+      ],
+      "operatingHours": "24 Hours",
+      "capacityPerDay": 150,
+      "hasElectricity": false,
+      "hasSolar": false,
+      "openTime": "00:00",
+      "closeTime": "23:59"
+    },
+    {
+      "id": "c3",
+      "name": "Parktown Medical Centre",
+      "address": "15 Princess of Wales Terrace, Parktown, Johannesburg, 2193",
+      "lat": -26.1772,
+      "lng": 28.0308,
+      "baseWaitTimeMinutes": 20,
+      "currentQueueCount": 3,
+      "services": [
+        "General Practitioner"
+      ],
+      "operatingHours": "08:00 - 18:00",
+      "capacityPerDay": 40,
+      "hasElectricity": false,
+      "hasSolar": true,
+      "openTime": "08:00",
+      "closeTime": "18:00"
+    },
+    {
+      "id": "c4",
+      "name": "Rosebank Health Clinic",
+      "address": "50 Bath Ave, Rosebank, Johannesburg, 2196",
+      "lat": -26.146,
+      "lng": 28.0371,
+      "baseWaitTimeMinutes": 15,
+      "currentQueueCount": 2,
+      "services": [
+        "General Practitioner",
+        "Travel Clinic",
+        "Dermatology"
+      ],
+      "operatingHours": "09:00 - 17:00",
+      "capacityPerDay": 30,
+      "hasElectricity": true,
+      "hasSolar": true,
+      "openTime": "09:00",
+      "closeTime": "17:00"
+    }
+  ],
+  "bookings": [
+    {
+      "id": "b1",
+      "userId": "u1",
+      "clinicId": "c1",
+      "bookingTime": "2026-06-18T15:43:07.820Z",
+      "appointmentTime": "2026-06-18T18:43:07.820Z",
+      "status": "Cancelled",
+      "queueNumber": "T-101",
+      "estimatedWaitTime": 35
+    },
+    {
+      "id": "b2",
+      "userId": "u1",
+      "clinicId": "c3",
+      "bookingTime": "2026-06-18T17:00:13.849Z",
+      "appointmentTime": "2026-06-18T17:00:13.844Z",
+      "status": "Completed",
+      "queueNumber": "C3-101",
+      "estimatedWaitTime": 50
+    }
+  ]
+}

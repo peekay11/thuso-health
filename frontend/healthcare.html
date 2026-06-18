@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Thuso Health - Clinic Manager Portal</title>
+  
+  <!-- SEO Meta Tags -->
+  <meta name="description" content="Dedicated portal for healthcare providers to update capacity, electricity status, operating hours, and manage patient queues.">
+  
+  <!-- Premium Typography & Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Custom Stylesheet -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="healthcare-portal">
+  
+  <!-- Notification Toast Container -->
+  <div id="toast-container"></div>
+
+  <!-- Header Section -->
+  <header>
+    <div class="header-container">
+      <div class="logo">
+        <i class="fa-solid fa-heart-pulse logo-icon"></i>
+        <h1>Thuso<span>Health</span> <small class="logo-sub">Manager</small></h1>
+      </div>
+      
+      <div class="nav-links">
+        <a href="index.html" class="nav-link"><i class="fa-solid fa-arrow-left"></i> Back to Patient Booking</a>
+      </div>
+      
+      <!-- Network Status Badge -->
+      <div class="status-panel">
+        <div id="connection-badge" class="badge online">
+          <span class="pulse-dot"></span>
+          <span id="connection-text">Online</span>
+        </div>
+        <button id="sync-btn" class="btn btn-icon btn-sync hidden" title="Sync Offline Operations">
+          <i class="fa-solid fa-arrows-rotate"></i>
+          <span id="sync-count">0</span> Sync
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="main-content">
+    
+    <!-- AUTH SECTION (Login / Register) -->
+    <div id="healthcare-auth" class="auth-container card">
+      <div class="auth-tabs">
+        <button id="auth-tab-login" class="auth-tab-btn active">Clinic Login</button>
+        <button id="auth-tab-register" class="auth-tab-btn">Register New Clinic</button>
+      </div>
+
+      <!-- Login Form -->
+      <form id="healthcare-login-form" class="auth-form">
+        <div class="form-group">
+          <label for="login-email"><i class="fa-regular fa-envelope"></i> Email Address</label>
+          <input type="email" id="login-email" value="sarah@thuso.health" required>
+        </div>
+        <div class="form-group">
+          <label for="login-password"><i class="fa-solid fa-lock"></i> Password</label>
+          <input type="password" id="login-password" value="password123" required>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">Sign In to Clinic Dashboard</button>
+      </form>
+
+      <!-- Register Form -->
+      <form id="healthcare-register-form" class="auth-form hidden">
+        <div class="form-group">
+          <label for="register-name"><i class="fa-regular fa-user"></i> Provider / Doctor Name</label>
+          <input type="text" id="register-name" placeholder="Dr. Jane Doe">
+        </div>
+        <div class="form-group">
+          <label for="register-email"><i class="fa-regular fa-envelope"></i> Email Address</label>
+          <input type="email" id="register-email" placeholder="jane@thuso.health">
+        </div>
+        <div class="form-group">
+          <label for="register-password"><i class="fa-solid fa-lock"></i> Account Password</label>
+          <input type="password" id="register-password" placeholder="Create password">
+        </div>
+        <div class="form-group">
+          <label for="register-clinic-name"><i class="fa-solid fa-house-chimney-medical"></i> Clinic Name</label>
+          <input type="text" id="register-clinic-name" placeholder="Rosebank Community Health">
+        </div>
+        <div class="form-group">
+          <label for="register-clinic-address"><i class="fa-solid fa-map-location-dot"></i> Clinic Address</label>
+          <input type="text" id="register-clinic-address" placeholder="50 Bath Ave, Rosebank, 2196">
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">Register Clinic & Account</button>
+      </form>
+    </div>
+
+    <!-- HEALTHCARE MANAGER DASHBOARD (Visible when logged in) -->
+    <div id="healthcare-dashboard" class="healthcare-dashboard-container hidden">
+      
+      <!-- Dashboard Header Card -->
+      <div class="dashboard-header-bar card">
+        <div class="provider-info">
+          <i class="fa-solid fa-user-doctor doctor-avatar"></i>
+          <div>
+            <h2 id="dashboard-provider-name">Dr. Sarah Dube</h2>
+            <span id="dashboard-clinic-title" class="text-accent">Parktown Medical Centre</span>
+          </div>
+        </div>
+        <button id="btn-healthcare-logout" class="btn btn-cancel">
+          <i class="fa-solid fa-right-from-bracket"></i> Sign Out
+        </button>
+      </div>
+
+      <div class="dashboard-grid">
+        
+        <!-- Left Column: Clinic Configuration (Capacity, Solar, Load Shedding, Hours) -->
+        <div class="config-section card">
+          <div class="config-header">
+            <i class="fa-solid fa-sliders text-accent"></i>
+            <h3>Clinic Operational Settings</h3>
+          </div>
+          
+          <form id="clinic-settings-form" class="settings-form">
+            <!-- Capacity -->
+            <div class="form-group">
+              <label for="setting-capacity">
+                <i class="fa-solid fa-users"></i> Daily Patient Capacity
+              </label>
+              <input type="number" id="setting-capacity" min="5" max="500" required>
+            </div>
+
+            <!-- Power Grid Status -->
+            <div class="form-group">
+              <label><i class="fa-solid fa-plug"></i> Grid Electricity Status</label>
+              <div class="toggle-group">
+                <label class="toggle-option">
+                  <input type="radio" name="setting-electricity" value="true" id="elect-on" checked>
+                  <span class="option-card power-on"><i class="fa-solid fa-bolt"></i> Grid Power On</span>
+                </label>
+                <label class="toggle-option">
+                  <input type="radio" name="setting-electricity" value="false" id="elect-off">
+                  <span class="option-card power-off"><i class="fa-solid fa-triangle-exclamation"></i> Outage / Loadsheading</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Solar Power Status -->
+            <div class="form-group">
+              <label><i class="fa-solid fa-solar-panel"></i> Solar Power Backup</label>
+              <div class="toggle-group">
+                <label class="toggle-option">
+                  <input type="radio" name="setting-solar" value="true" id="solar-on">
+                  <span class="option-card solar-on"><i class="fa-solid fa-sun"></i> Solar Installed</span>
+                </label>
+                <label class="toggle-option">
+                  <input type="radio" name="setting-solar" value="false" id="solar-off" checked>
+                  <span class="option-card solar-off"><i class="fa-solid fa-ban"></i> No Solar Backup</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Operating Hours -->
+            <div class="hours-grid">
+              <div class="form-group">
+                <label for="setting-open-time"><i class="fa-regular fa-clock"></i> Opening Time</label>
+                <input type="time" id="setting-open-time" required>
+              </div>
+              <div class="form-group">
+                <label for="setting-close-time"><i class="fa-regular fa-clock"></i> Closing Time</label>
+                <input type="time" id="setting-close-time" required>
+              </div>
+            </div>
+
+            <!-- Services offered checkboxes -->
+            <div class="form-group">
+              <label><i class="fa-solid fa-hand-holding-medical"></i> Medical Services Offered</label>
+              <div class="checkbox-grid">
+                <label class="checkbox-option">
+                  <input type="checkbox" name="setting-services" value="General Practitioner">
+                  <span>GP Consultation</span>
+                </label>
+                <label class="checkbox-option">
+                  <input type="checkbox" name="setting-services" value="Dentistry">
+                  <span>Dentistry</span>
+                </label>
+                <label class="checkbox-option">
+                  <input type="checkbox" name="setting-services" value="Pediatrics">
+                  <span>Pediatrics</span>
+                </label>
+                <label class="checkbox-option">
+                  <input type="checkbox" name="setting-services" value="Vaccinations">
+                  <span>Vaccinations</span>
+                </label>
+                <label class="checkbox-option">
+                  <input type="checkbox" name="setting-services" value="HIV/AIDS Care">
+                  <span>HIV/AIDS Care</span>
+                </label>
+                <label class="checkbox-option">
+                  <input type="checkbox" name="setting-services" value="Pharmacy">
+                  <span>Pharmacy</span>
+                </label>
+              </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-block">Save Operational Settings</button>
+          </form>
+        </div>
+
+        <!-- Right Column: Clinic Live Patient Queue Admin -->
+        <div class="queue-admin-section card">
+          <div class="config-header justify-between">
+            <div class="align-center gap-sm">
+              <i class="fa-solid fa-list-ol text-accent"></i>
+              <h3>Active Patient Queue</h3>
+            </div>
+            <span id="dashboard-queue-badge" class="badge badge-info">0 Patients</span>
+          </div>
+
+          <div id="dashboard-queue-list" class="queue-admin-list">
+            <!-- Dynamically populated -->
+            <div class="empty-state">
+              <i class="fa-solid fa-users-slash"></i>
+              <h3>No Patients in Queue</h3>
+              <p>Bookings at this clinic will appear here in real-time.</p>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </main>
+
+  <footer>
+    <div class="footer-container">
+      <p>&copy; 2026 Thuso Health. Solving medical queues offline and online.</p>
+    </div>
+  </footer>
+
+  <!-- Application Logic -->
+  <script src="app.js"></script>
+</body>
+</html>

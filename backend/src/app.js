@@ -1,12 +1,16 @@
 const express = require('express');
 const cors = require('cors');
 const apiRoutes = require('./routes/api.routes');
+const bookingRoutes = require('./routes/bookingRoutes');
 
 const app = express();
 
 // Middlewares
 app.use(cors());
 app.use(express.json());
+
+// Dedicated booking routes (must come before generic apiRoutes)
+app.use('/api/bookings', bookingRoutes);
 
 // API Routes
 app.use('/api', apiRoutes);

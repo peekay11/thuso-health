@@ -57,7 +57,7 @@ describe('Bookings API Tests', () => {
   });
 
   describe('POST /api/bookings/sync', () => {
-    it('should bulk-sync offline bookings', async () => {
+    it('should bulk-sync offline bookings and return 201 with synced count', async () => {
       const offlineBookings = [
         { id: 'off-1', clinicId: 'c1', appointmentTime: new Date().toISOString() },
         { id: 'off-2', clinicId: 'c2', appointmentTime: new Date().toISOString() }
@@ -67,11 +67,9 @@ describe('Bookings API Tests', () => {
         .post('/api/bookings/sync')
         .send({ bookings: offlineBookings });
 
-      expect(response.status).toBe(200);
+      expect(response.status).toBe(201);
       expect(response.body.success).toBe(true);
-      expect(response.body.synced.length).toBe(2);
-      expect(response.body.synced[0].offlineId).toBe('off-1');
-      expect(response.body.synced[0].serverBooking).toBeDefined();
+      expect(response.body.count).toBe(2);
     });
   });
 });

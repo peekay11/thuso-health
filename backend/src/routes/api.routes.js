@@ -25,7 +25,7 @@ router.put('/clinics/:id', ClinicController.updateClinic);
 router.get('/bookings', BookingController.getBookings);
 router.get('/bookings/user/:userId', BookingController.getBookingsByUser);
 router.post('/bookings', BookingController.createBooking);
-router.post('/bookings/sync', BookingController.syncOfflineBookings);
+// Note: /bookings/sync is handled by the dedicated bookingRoutes.js mounted in app.js
 router.put('/bookings/:id/checkin', BookingController.checkInBooking);
 router.put('/bookings/:id/complete', BookingController.completeBooking);
 router.delete('/bookings/:id', BookingController.cancelBooking);

@@ -228,6 +228,78 @@
           </div>
         </div>
 
+        <!-- Practitioner Health Passport Admin Portal -->
+        <div class="queue-admin-section card margin-top" id="practitioner-passport-panel">
+          <div class="config-header">
+            <i class="fa-solid fa-passport text-accent"></i>
+            <h3>Digital Health Passport Lookup</h3>
+          </div>
+          
+          <!-- Lookup form -->
+          <div class="settings-form" style="margin-top: 1rem;">
+            <div class="form-group">
+              <label for="lookup-patient-id"><i class="fa-solid fa-id-card"></i> Patient ID / Email</label>
+              <input type="text" id="lookup-patient-id" placeholder="e.g. u1 or paseka@thuso.health" value="u1">
+            </div>
+            <div class="form-group">
+              <label for="lookup-patient-pin"><i class="fa-solid fa-key"></i> Patient Consent PIN (If required)</label>
+              <input type="password" id="lookup-patient-pin" placeholder="Enter 4-digit PIN" maxlength="4">
+            </div>
+            <button id="btn-lookup-passport" class="btn btn-primary btn-block">
+              <i class="fa-solid fa-magnifying-glass-medical"></i> Lookup Health Passport
+            </button>
+          </div>
+
+          <!-- Passport Results and Consultation Summary form -->
+          <div id="lookup-results-container" class="hidden" style="margin-top: 1.5rem; border-top: 1px solid var(--border-color); padding-top: 1rem;">
+            <div class="passport-header-flex" style="border-bottom: none; padding-bottom: 0;">
+              <div class="passport-details">
+                <span class="passport-badge" style="background: #f0fdf4; color: #166534;"><i class="fa-solid fa-circle-check"></i> Authorized Access</span>
+                <h4 id="practitioner-patient-name" style="margin: 0.25rem 0; font-size: 1rem; font-weight:700;">-</h4>
+                <p>ThusoID: <span id="practitioner-thuso-id" class="passport-id">-</span></p>
+              </div>
+            </div>
+
+            <!-- Scrollable Timeline of records -->
+            <div class="section-title-container" style="margin-top: 1rem; margin-bottom: 0.5rem;">
+              <h5 style="margin:0; font-size:0.85rem; color:var(--text-muted);">Medical History Timeline</h5>
+            </div>
+            <div class="records-timeline" id="practitioner-records-timeline" style="max-height: 150px;">
+              <!-- Populated dynamically -->
+            </div>
+
+            <!-- Add Consultation Form -->
+            <div class="section-title-container" style="margin-top: 1.5rem; border-top: 1px solid var(--border-color); padding-top: 1rem; margin-bottom: 0.5rem;">
+              <h5 style="margin:0; font-size:0.85rem; color:var(--text-muted);">Add Consultation Summary</h5>
+            </div>
+            <form id="consultation-form" class="settings-form">
+              <div class="form-group">
+                <label for="consult-diagnosis"><i class="fa-solid fa-stethoscope"></i> Diagnosis (Required)</label>
+                <input type="text" id="consult-diagnosis" placeholder="e.g. Mild respiratory infection" required>
+              </div>
+              <div class="form-group">
+                <label for="consult-treatment"><i class="fa-solid fa-prescription-bottle-medical"></i> Treatment Plan</label>
+                <textarea id="consult-treatment" rows="2" placeholder="e.g. Bed rest, drink plenty of water" style="width: 100%; border: 1px solid var(--border-color); border-radius: 4px; padding: 0.5rem; font-family: inherit; font-size: 0.85rem;"></textarea>
+              </div>
+              <div class="form-group">
+                <label for="consult-prescription"><i class="fa-solid fa-pills"></i> Medication Prescribed</label>
+                <input type="text" id="consult-prescription" placeholder="e.g. Paracetamol 500mg, Vitamin C">
+              </div>
+              <div class="form-group">
+                <label for="consult-attachment"><i class="fa-solid fa-paperclip"></i> Upload Report/Results (Simulated R2)</label>
+                <input type="file" id="consult-attachment" style="font-size:0.8rem;">
+              </div>
+              <button type="submit" class="btn btn-primary btn-block">
+                <i class="fa-solid fa-floppy-disk"></i> Save Summary to Passport
+              </button>
+            </form>
+          </div>
+          
+          <div id="lookup-error-container" class="hidden alert alert-danger" style="margin-top: 1rem; padding: 0.75rem; border-radius: 6px; font-size: 0.8rem; background: #fef2f2; color: #991b1b; border: 1px solid #fee2e2;">
+            <!-- Error message -->
+          </div>
+        </div>
+
       </div>
 
     </div>

@@ -170,6 +170,14 @@ header {
   border: 1px solid #dbeafe;
 }
 
+.badge.zero-rated {
+  background: #f0fdf4;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
 .pulse-dot {
   width: 7px;
   height: 7px;
@@ -1126,4 +1134,302 @@ footer {
   font-weight: 500;
   color: var(--text-muted);
   margin-top: auto;
+}
+
+/* Digital Health Passport & Consent Styles */
+.passport-card {
+  border-left: 4px solid var(--color-primary);
+  background: #ffffff;
+}
+
+.passport-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #eff6ff;
+  color: var(--color-primary);
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  margin-bottom: 0.75rem;
+}
+
+.passport-header-flex {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 1rem;
+}
+
+.passport-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.passport-details h3 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-main);
+  margin: 0;
+}
+
+.passport-details p {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.passport-id {
+  font-family: monospace;
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+.passport-qr-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.passport-qr-mock {
+  width: 70px;
+  height: 70px;
+  border: 2px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 3px;
+  background: white;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.passport-qr-mock img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.consent-controls {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.consent-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.consent-row:last-child {
+  margin-bottom: 0;
+}
+
+.consent-label-with-icon {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.consent-label-with-icon i {
+  color: var(--color-primary);
+}
+
+.consent-pin-display {
+  font-family: monospace;
+  font-size: 0.9rem;
+  font-weight: 700;
+  background: #e2e8f0;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  border: 1px solid #cbd5e1;
+}
+
+/* Switch Styles */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 36px;
+  height: 20px;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #cbd5e1;
+  transition: .4s;
+  border-radius: 34px;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 14px;
+  width: 14px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: .3s;
+  border-radius: 50%;
+}
+
+input:checked + .slider {
+  background-color: var(--color-primary);
+}
+
+input:focus + .slider {
+  box-shadow: 0 0 1px var(--color-primary);
+}
+
+input:checked + .slider:before {
+  transform: translateX(16px);
+}
+
+.language-selector-wrapper select {
+  font-size: 0.75rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  border: 1px solid #cbd5e1;
+  background: white;
+  font-weight: 600;
+}
+
+/* Timeline of medical records */
+.records-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-height: 220px;
+  overflow-y: auto;
+  margin-bottom: 1rem;
+  padding-right: 0.25rem;
+}
+
+.timeline-item {
+  position: relative;
+  padding-left: 1rem;
+  border-left: 2px solid #e2e8f0;
+}
+
+.timeline-item:before {
+  content: '';
+  position: absolute;
+  left: -5px;
+  top: 4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  border: 2px solid white;
+}
+
+.timeline-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-bottom: 0.25rem;
+}
+
+.timeline-doctor {
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.timeline-body {
+  background: #f8fafc;
+  border: 1px solid #f1f5f9;
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8rem;
+}
+
+.timeline-body p {
+  margin-bottom: 0.25rem;
+  margin-top: 0;
+}
+
+.timeline-body p:last-child {
+  margin-bottom: 0;
+}
+
+.timeline-body strong {
+  color: var(--text-main);
+}
+
+.timeline-attachment {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.7rem;
+  color: var(--color-primary);
+  font-weight: 600;
+  text-decoration: none;
+  margin-top: 0.25rem;
+}
+
+.timeline-attachment:hover {
+  text-decoration: underline;
+}
+
+.audit-log-toggle-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 0.5rem;
+}
+
+.audit-log-toggle {
+  font-size: 0.75rem;
+  color: var(--color-primary);
+  background: none;
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.audit-log-container {
+  border-top: 1px solid #f1f5f9;
+  margin-top: 0.75rem;
+  padding-top: 0.5rem;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.audit-log-item {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  padding: 0.2rem 0;
+}
+
+.audit-log-item span.action {
+  font-weight: 700;
+  color: var(--text-main);
 }

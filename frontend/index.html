@@ -35,6 +35,10 @@
       
       <!-- Network Status Badge -->
       <div class="status-panel">
+        <div class="badge zero-rated" title="Thuso Health is zero-rated for data usage on local ISPs">
+          <i class="fa-solid fa-bolt text-warning"></i>
+          <span>Data-Free Active</span>
+        </div>
         <div id="connection-badge" class="badge online">
           <span class="pulse-dot"></span>
           <span id="connection-text">Online</span>
@@ -127,6 +131,113 @@
             <div class="empty-history">
               <p>No recent bookings.</p>
             </div>
+          </div>
+        </div>
+
+        <div class="section-title-container margin-top">
+          <h2>Digital Health Passport</h2>
+        </div>
+        <div class="card passport-card">
+          <div class="passport-header-flex">
+            <div class="passport-details">
+              <span class="passport-badge"><i class="fa-solid fa-passport"></i> Health Passport</span>
+              <h3 id="passport-patient-name">Paseka Moloi</h3>
+              <p>ThusoID: <span id="passport-thuso-id" class="passport-id">TH-u1</span></p>
+            </div>
+            <div class="passport-qr-container">
+              <div class="passport-qr-mock">
+                <i class="fa-solid fa-qrcode" style="font-size: 3rem; color: var(--text-main);"></i>
+              </div>
+              <span style="font-size: 0.65rem; color: var(--text-muted); font-weight: 600;">Scan QR Code</span>
+            </div>
+          </div>
+
+          <!-- POPIA Consent configuration -->
+          <div class="consent-controls">
+            <div class="consent-row">
+              <div class="consent-label-with-icon">
+                <i class="fa-solid fa-shield-halved"></i>
+                <span>Grant Practitioner Access</span>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="consent-grant-access" checked>
+                <span class="slider"></span>
+              </label>
+            </div>
+            <div class="consent-row">
+              <div class="consent-label-with-icon">
+                <i class="fa-solid fa-key"></i>
+                <span>One-Time Access PIN</span>
+              </div>
+              <span id="consent-pin-code" class="consent-pin-display">1234</span>
+            </div>
+            <div class="consent-row">
+              <div class="consent-label-with-icon">
+                <i class="fa-solid fa-language"></i>
+                <span>Preferred Language</span>
+              </div>
+              <div class="language-selector-wrapper">
+                <select id="passport-lang-select">
+                  <option value="en">English</option>
+                  <option value="zulu">isiZulu</option>
+                  <option value="sesotho">Sesotho</option>
+                  <option value="xhosa">isiXhosa</option>
+                  <option value="afrikaans">Afrikaans</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Medical records history timeline -->
+          <div class="records-timeline" id="passport-records-timeline">
+            <!-- Populated dynamically -->
+            <div class="empty-state" style="padding: 1rem 0;">
+              <i class="fa-solid fa-notes-medical"></i>
+              <h3>No Medical Records</h3>
+              <p>Consultation logs will appear here once written by a practitioner.</p>
+            </div>
+          </div>
+
+          <!-- PDF generation trigger -->
+          <button id="download-passport-btn" class="btn btn-primary btn-block">
+            <i class="fa-solid fa-file-arrow-down"></i> Download Health Passport (PDF)
+          </button>
+
+          <!-- Audit Logs toggle and container -->
+          <div class="audit-log-toggle-container">
+            <button class="audit-log-toggle" id="toggle-audit-logs">
+              <i class="fa-solid fa-angle-right"></i> View Access Audit Logs (POPIA)
+            </button>
+          </div>
+          <div class="audit-log-container hidden" id="audit-logs-list">
+            <!-- Filled dynamically -->
+          </div>
+        </div>
+
+        <!-- Opt-in Reminders Settings Card -->
+        <div class="section-title-container margin-top">
+          <h2>Opt-in Notifications</h2>
+        </div>
+        <div class="card">
+          <div class="consent-row" style="margin-bottom: 0.75rem;">
+            <div class="consent-label-with-icon">
+              <i class="fa-regular fa-bell"></i>
+              <span>Medication Reminders (SMS/WhatsApp)</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="notify-meds" checked>
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="consent-row">
+            <div class="consent-label-with-icon">
+              <i class="fa-regular fa-calendar-check"></i>
+              <span>Appointment Alerts</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="notify-appointments" checked>
+              <span class="slider"></span>
+            </label>
           </div>
         </div>
       </section>

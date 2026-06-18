@@ -12,14 +12,20 @@ const loadDb = () => {
     if (fs.existsSync(dbPath)) {
       const content = fs.readFileSync(dbPath, 'utf8');
       db = JSON.parse(content);
+      // Ensure new tables are initialized
+      if (!db.users) db.users = [];
+      if (!db.clinics) db.clinics = [];
+      if (!db.bookings) db.bookings = [];
+      if (!db.medical_records) db.medical_records = [];
+      if (!db.audit_logs) db.audit_logs = [];
     } else {
       // Create with default empty structure if it doesn't exist
-      db = { users: [], clinics: [], bookings: [] };
+      db = { users: [], clinics: [], bookings: [], medical_records: [], audit_logs: [] };
       saveDb();
     }
   } catch (error) {
     console.error("Error loading db.json, using fallback", error);
-    db = { users: [], clinics: [], bookings: [] };
+    db = { users: [], clinics: [], bookings: [], medical_records: [], audit_logs: [] };
   }
 };
 
@@ -40,7 +46,11 @@ const resetDb = () => {
         name: "Paseka Moloi",
         email: "paseka@thuso.health",
         phone: "+27 82 123 4567",
-        role: "patient"
+        role: "patient",
+        thuso_id_hash: "thuso_u1_hash",
+        consentPin: "1234",
+        isAccessGranted: true,
+        language: "en"
       },
       {
         id: "u2",
@@ -128,6 +138,30 @@ const resetDb = () => {
         status: "Confirmed",
         queueNumber: "T-101",
         estimatedWaitTime: 35
+      }
+    ],
+    medical_records: [
+      {
+        record_id: 1,
+        patient_id: "u1",
+        doctor_id: "u2",
+        doctor_name: "Dr. Sarah Dube",
+        clinic_name: "Parktown Medical Centre",
+        diagnosis: "Mild respiratory infection",
+        treatment_plan: "Bed rest and hydration",
+        medication_prescribed: "Paracetamol 500mg, Vitamin C",
+        file_url_r2: "https://r2.thuso.health/reports/u1-rec1.pdf",
+        created_at: new Date(Date.now() - 86400000 * 2).toISOString()
+      }
+    ],
+    audit_logs: [
+      {
+        log_id: 1,
+        timestamp: new Date(Date.now() - 86400000 * 2).toISOString(),
+        practitioner_id: "u2",
+        practitioner_name: "Dr. Sarah Dube",
+        patient_id: "u1",
+        action: "WRITE_RECORD"
       }
     ]
   };

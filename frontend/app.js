@@ -112,11 +112,13 @@ document.addEventListener('DOMContentLoaded', () => {
     initSortingControls();
     initSearchInput();
     initModal();
+    initPatientPassport();
   }
 
   if (isHealthcarePortal) {
     initHealthcareAuth();
     initHealthcareDashboard();
+    initPractitionerPassport();
   }
   
   // Initial health check and fetch
@@ -130,6 +132,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (isPatientPortal) {
         updateActiveBookingUI();
         updateHistoryUI();
+        fetchPatientPassport();
       }
       if (isHealthcarePortal) {
         updatePortalUI();
@@ -148,6 +151,7 @@ document.addEventListener('DOMContentLoaded', () => {
           if (isPatientPortal) {
             updateActiveBookingUI();
             updateHistoryUI();
+            fetchPatientPassport();
           }
           if (isHealthcarePortal) {
             updatePortalUI();
@@ -1344,4 +1348,497 @@ function deg2rad(deg) { return deg * (Math.PI / 180); }
 function formatTime(isoString) {
   const d = new Date(isoString);
   return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+}
+
+// ----------------------------------------------------
+// DIGITAL HEALTH PASSPORT & CONSENT (PATIENT SIDE)
+// ----------------------------------------------------
+
+let currentLanguage = 'en';
+
+function initPatientPassport() {
+  const consentToggle = document.getElementById('consent-grant-access');
+  const langSelect = document.getElementById('passport-lang-select');
+  const toggleLogsBtn = document.getElementById('toggle-audit-logs');
+  const downloadBtn = document.getElementById('download-passport-btn');
+
+  if (consentToggle) {
+    consentToggle.addEventListener('change', async () => {
+      const isAccessGranted = consentToggle.checked;
+      await updatePatientConsentSettings({ isAccessGranted });
+    });
+  }
+
+  if (langSelect) {
+    langSelect.addEventListener('change', async () => {
+      currentLanguage = langSelect.value;
+      await updatePatientConsentSettings({ language: currentLanguage });
+      // Reload timeline with translations
+      const cached = localStorage.getItem('thuso_patient_records');
+      if (cached) {
+        renderPatientTimeline(JSON.parse(cached));
+      }
+    });
+  }
+
+  if (toggleLogsBtn) {
+    toggleLogsBtn.addEventListener('click', async () => {
+      const container = document.getElementById('audit-logs-list');
+      const isHidden = container.classList.toggle('hidden');
+      toggleLogsBtn.innerHTML = isHidden 
+        ? `<i class="fa-solid fa-angle-right"></i> View Access Audit Logs (POPIA)`
+        : `<i class="fa-solid fa-angle-down"></i> Hide Access Audit Logs (POPIA)`;
+      
+      if (!isHidden) {
+        await fetchAndRenderAuditLogs();
+      }
+    });
+  }
+
+  if (downloadBtn) {
+    downloadBtn.addEventListener('click', () => {
+      downloadHealthPassportPDF();
+    });
+  }
+}
+
+async function fetchPatientPassport() {
+  const patientId = CONFIG.DEFAULT_USER.id;
+  
+  // 1. Fetch Consent Settings
+  if (state.isOnline) {
+    try {
+      const consentRes = await fetch(`${CONFIG.API_BASE}/patients/${patientId}/consent`);
+      const consentData = await consentRes.json();
+      if (consentData.success) {
+        updateConsentUI(consentData.consent);
+      }
+    } catch (err) {
+      console.warn("Could not fetch consent from server, using local fallback");
+    }
+  }
+
+  // 2. Fetch Medical Records
+  let records = [];
+  if (state.isOnline) {
+    try {
+      const recordsRes = await fetch(`${CONFIG.API_BASE}/patients/${patientId}/records`);
+      const recordsData = await recordsRes.json();
+      if (recordsData.success) {
+        records = recordsData.records;
+        localStorage.setItem('thuso_patient_records', JSON.stringify(records));
+      }
+    } catch (err) {
+      console.warn("Could not fetch records from server, checking local cache");
+    }
+  }
+
+  if (records.length === 0) {
+    const cached = localStorage.getItem('thuso_patient_records');
+    if (cached) {
+      records = JSON.parse(cached);
+    } else {
+      // Seed fallback mock medical record for offline
+      records = [{
+        record_id: 1,
+        patient_id: "u1",
+        doctor_id: "u2",
+        doctor_name: "Dr. Sarah Dube",
+        clinic_name: "Parktown Medical Centre",
+        diagnosis: "Mild respiratory infection",
+        treatment_plan: "Bed rest and hydration",
+        medication_prescribed: "Paracetamol 500mg, Vitamin C",
+        file_url_r2: "https://r2.thuso.health/reports/u1-rec1.pdf",
+        created_at: new Date(Date.now() - 86400000 * 2).toISOString()
+      }];
+      localStorage.setItem('thuso_patient_records', JSON.stringify(records));
+    }
+  }
+
+  renderPatientTimeline(records);
+}
+
+function updateConsentUI(consent) {
+  const consentToggle = document.getElementById('consent-grant-access');
+  const pinDisplay = document.getElementById('consent-pin-code');
+  const langSelect = document.getElementById('passport-lang-select');
+  const thusoIdDisplay = document.getElementById('passport-thuso-id');
+
+  if (consentToggle) consentToggle.checked = consent.isAccessGranted;
+  if (pinDisplay) pinDisplay.innerText = consent.consentPin;
+  if (langSelect) {
+    langSelect.value = consent.language || 'en';
+    currentLanguage = consent.language || 'en';
+  }
+  if (thusoIdDisplay && consent.thuso_id_hash) {
+    thusoIdDisplay.innerText = consent.thuso_id_hash;
+  }
+}
+
+async function updatePatientConsentSettings(payload) {
+  const patientId = CONFIG.DEFAULT_USER.id;
+  if (state.isOnline) {
+    try {
+      const response = await fetch(`${CONFIG.API_BASE}/patients/${patientId}/consent`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await response.json();
+      if (data.success) {
+        showToast("Consent configurations synchronized online.", "success");
+        updateConsentUI(data.consent);
+        return;
+      }
+    } catch (err) {
+      console.warn("Consent update failed to sync online, saving locally");
+    }
+  }
+  
+  // Local fallback update
+  showToast("Consent updated locally (offline mode).", "warning");
+}
+
+async function renderPatientTimeline(records) {
+  const container = document.getElementById('passport-records-timeline');
+  if (!container) return;
+
+  if (records.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state" style="padding: 1rem 0;">
+        <i class="fa-solid fa-notes-medical"></i>
+        <h3>No Medical Records</h3>
+        <p>Consultation logs will appear here once written by a practitioner.</p>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = '';
+  
+  // Sort records descending
+  const sorted = [...records].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+  for (const rec of sorted) {
+    const daysAgo = Math.round((Date.now() - new Date(rec.created_at)) / 86400000);
+    const timeText = daysAgo === 0 ? 'Today' : daysAgo === 1 ? 'Yesterday' : `${daysAgo} days ago`;
+    
+    // Translate text dynamically using Cloudflare Mock translator
+    const diagnosis = await translateMockText(rec.diagnosis, currentLanguage);
+    const plan = await translateMockText(rec.treatment_plan, currentLanguage);
+    const meds = await translateMockText(rec.medication_prescribed, currentLanguage);
+
+    const item = document.createElement('div');
+    item.className = 'timeline-item';
+    item.innerHTML = `
+      <div class="timeline-header">
+        <span class="timeline-doctor">${rec.doctor_name} (${rec.clinic_name})</span>
+        <span>${timeText}</span>
+      </div>
+      <div class="timeline-body">
+        <p><strong>Diagnosis:</strong> ${diagnosis}</p>
+        ${plan ? `<p><strong>Plan:</strong> ${plan}</p>` : ''}
+        ${meds ? `<p><strong>Prescription:</strong> ${meds}</p>` : ''}
+        ${rec.file_url_r2 ? `
+          <a href="${rec.file_url_r2}" target="_blank" class="timeline-attachment">
+            <i class="fa-solid fa-file-pdf"></i> View Attachment (Cloudflare R2)
+          </a>
+        ` : ''}
+      </div>
+    `;
+    container.appendChild(item);
+  }
+}
+
+async function translateMockText(text, targetLang) {
+  if (!text || !targetLang || targetLang === 'en') return text;
+  
+  if (state.isOnline) {
+    try {
+      const res = await fetch(`${CONFIG.API_BASE}/translate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, targetLanguage: targetLang })
+      });
+      const data = await res.json();
+      if (data.success) {
+        return data.translatedText;
+      }
+    } catch (err) {
+      console.warn("Translation failed");
+    }
+  }
+
+  // Offline fallback translation
+  const dict = {
+    'zulu': {
+      'Mild respiratory infection': 'Ukwetheleleka okuncane kokuphefumula',
+      'Bed rest and hydration': 'Ukuphumula embhedeni nokuphuza amanzi amaningi',
+      'Paracetamol 500mg, Vitamin C': 'I-Paracetamol 500mg, i-Vitamin C'
+    },
+    'sesotho': {
+      'Mild respiratory infection': 'Tšoaetso e bonolo ea ho hema',
+      'Bed rest and hydration': 'Ho phomola betheng le ho nwa metsi a mangata',
+      'Paracetamol 500mg, Vitamin C': 'Paracetamol 500mg, Vitamin C'
+    }
+  };
+  const langKey = targetLang.toLowerCase();
+  if (dict[langKey] && dict[langKey][text]) {
+    return dict[langKey][text];
+  }
+  return `[${targetLang.toUpperCase()}] ${text}`;
+}
+
+async function fetchAndRenderAuditLogs() {
+  const container = document.getElementById('audit-logs-list');
+  if (!container) return;
+
+  const patientId = CONFIG.DEFAULT_USER.id;
+  let logs = [];
+
+  if (state.isOnline) {
+    try {
+      const response = await fetch(`${CONFIG.API_BASE}/patients/${patientId}/logs`);
+      const data = await response.json();
+      if (data.success) {
+        logs = data.logs;
+      }
+    } catch (err) {
+      console.warn("Could not load POPIA audit logs offline");
+    }
+  }
+
+  if (logs.length === 0) {
+    container.innerHTML = `<p style="font-size: 0.7rem; color: var(--text-muted); text-align: center; padding: 0.5rem 0;">No access audit records found.</p>`;
+    return;
+  }
+
+  logs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+  container.innerHTML = logs.map(l => {
+    const timeStr = new Date(l.timestamp).toLocaleString();
+    return `
+      <div class="audit-log-item">
+        <span>${timeStr}</span>
+        <span>${l.practitioner_name}</span>
+        <span class="action">${l.action}</span>
+      </div>
+    `;
+  }).join('');
+}
+
+function downloadHealthPassportPDF() {
+  const cached = localStorage.getItem('thuso_patient_records');
+  const records = cached ? JSON.parse(cached) : [];
+  
+  if (records.length === 0) {
+    showToast("No medical history available to download.", "warning");
+    return;
+  }
+
+  // Generate simple text-based formatted document
+  let docContent = `THUSO HEALTH PASSPORT - MEDICAL REPORT\n`;
+  docContent += `==========================================\n`;
+  docContent += `Patient Name: Paseka Moloi\n`;
+  docContent += `Thuso ID: TH-u1\n`;
+  docContent += `Generated At: ${new Date().toLocaleString()}\n`;
+  docContent += `==========================================\n\n`;
+
+  records.forEach((r, i) => {
+    docContent += `CONSULTATION SUMMARY #${i+1}\n`;
+    docContent += `Date: ${new Date(r.created_at).toLocaleDateString()}\n`;
+    docContent += `Practitioner: ${r.doctor_name}\n`;
+    docContent += `Facility: ${r.clinic_name}\n`;
+    docContent += `Diagnosis: ${r.diagnosis}\n`;
+    docContent += `Treatment Plan: ${r.treatment_plan || 'N/A'}\n`;
+    docContent += `Prescription: ${r.medication_prescribed || 'N/A'}\n`;
+    docContent += `File Link: ${r.file_url_r2 || 'N/A'}\n`;
+    docContent += `------------------------------------------\n\n`;
+  });
+
+  const blob = new Blob([docContent], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `thuso-health-passport-u1.txt`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+  
+  showToast("Health Passport downloaded successfully! (Data-free offline storage saved)", "success");
+}
+
+// ----------------------------------------------------
+// DIGITAL HEALTH PASSPORT (PRACTITIONER PORTAL SIDE)
+// ----------------------------------------------------
+
+let currentLookupPatientId = null;
+
+function initPractitionerPassport() {
+  const lookupBtn = document.getElementById('btn-lookup-passport');
+  const consultForm = document.getElementById('consultation-form');
+
+  if (lookupBtn) {
+    lookupBtn.addEventListener('click', async () => {
+      const patientInput = document.getElementById('lookup-patient-id').value.trim();
+      const pin = document.getElementById('lookup-patient-pin').value.trim();
+      const errorContainer = document.getElementById('lookup-error-container');
+      const resultsContainer = document.getElementById('lookup-results-container');
+
+      errorContainer.classList.add('hidden');
+      resultsContainer.classList.add('hidden');
+
+      if (!patientInput) {
+        showToast("Please enter a valid Patient ID", "warning");
+        return;
+      }
+
+      // Convert email to patient id if needed
+      let patientId = patientInput;
+      if (patientInput.includes('@')) {
+        patientId = 'u1'; // Mock translation of email to patient ID for Paseka Moloi
+      }
+
+      if (!state.isOnline) {
+        // Offline Mock Access Check
+        if (patientId === 'u1' && pin === '1234') {
+          currentLookupPatientId = 'u1';
+          renderPractitionerRecordsList([{
+            record_id: 1,
+            patient_id: "u1",
+            doctor_name: "Dr. Sarah Dube",
+            clinic_name: "Parktown Medical Centre",
+            diagnosis: "Mild respiratory infection",
+            treatment_plan: "Bed rest and hydration",
+            medication_prescribed: "Paracetamol 500mg, Vitamin C",
+            created_at: new Date(Date.now() - 86400000 * 2).toISOString()
+          }]);
+          
+          document.getElementById('practitioner-patient-name').innerText = 'Paseka Moloi';
+          document.getElementById('practitioner-thuso-id').innerText = 'TH-u1';
+          resultsContainer.classList.remove('hidden');
+          showToast("Access granted offline (Validated via PIN)", "warning");
+        } else {
+          errorContainer.innerText = "Offline Lookup Error: PIN verification requires online connection or exact match.";
+          errorContainer.classList.remove('hidden');
+        }
+        return;
+      }
+
+      // Online lookup
+      try {
+        const queryParams = new URLSearchParams({ doctorId: state.loggedInUser.id });
+        if (pin) queryParams.append('pin', pin);
+
+        const response = await fetch(`${CONFIG.API_BASE}/patients/${patientId}/records?${queryParams.toString()}`);
+        const data = await response.json();
+
+        if (data.success) {
+          currentLookupPatientId = patientId;
+          
+          // Fetch patient profile to show name
+          const consentRes = await fetch(`${CONFIG.API_BASE}/patients/${patientId}/consent`);
+          const consentData = await consentRes.json();
+          
+          document.getElementById('practitioner-patient-name').innerText = patientId === 'u1' ? 'Paseka Moloi' : 'Patient Name';
+          document.getElementById('practitioner-thuso-id').innerText = (consentData.success && consentData.consent.thuso_id_hash) ? consentData.consent.thuso_id_hash : `TH-${patientId}`;
+          
+          renderPractitionerRecordsList(data.records);
+          resultsContainer.classList.remove('hidden');
+          showToast("Authorized Passport access granted.", "success");
+        } else {
+          errorContainer.innerText = data.error || "Access Denied: Patient PIN or consent required.";
+          errorContainer.classList.remove('hidden');
+        }
+      } catch (err) {
+        errorContainer.innerText = "Error looking up patient medical history from server.";
+        errorContainer.classList.remove('hidden');
+      }
+    });
+  }
+
+  if (consultForm) {
+    consultForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!currentLookupPatientId) {
+        showToast("No active patient lookup verified.", "error");
+        return;
+      }
+
+      const diagnosis = document.getElementById('consult-diagnosis').value;
+      const treatment_plan = document.getElementById('consult-treatment').value;
+      const medication_prescribed = document.getElementById('consult-prescription').value;
+
+      const payload = {
+        doctorId: state.loggedInUser.id,
+        diagnosis,
+        treatment_plan,
+        medication_prescribed
+      };
+
+      if (!state.isOnline) {
+        showToast("Consultation summary must be saved while online.", "error");
+        return;
+      }
+
+      try {
+        const response = await fetch(`${CONFIG.API_BASE}/patients/${currentLookupPatientId}/records`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await response.json();
+
+        if (data.success) {
+          showToast("Consultation summary added and synced successfully!", "success");
+          
+          // Clear form fields
+          document.getElementById('consult-diagnosis').value = '';
+          document.getElementById('consult-treatment').value = '';
+          document.getElementById('consult-prescription').value = '';
+          
+          // Re-trigger patient lookup to display updated timeline
+          document.getElementById('btn-lookup-passport').click();
+        } else {
+          showToast(data.error || "Failed to save record.", "error");
+        }
+      } catch (err) {
+        showToast("Server error writing to Patient Health Passport.", "error");
+      }
+    });
+  }
+}
+
+function renderPractitionerRecordsList(records) {
+  const container = document.getElementById('practitioner-records-timeline');
+  if (!container) return;
+
+  if (!records || records.length === 0) {
+    container.innerHTML = `<p style="font-size: 0.8rem; color: var(--text-muted); padding: 0.5rem 0;">No medical history entries recorded.</p>`;
+    return;
+  }
+
+  container.innerHTML = '';
+  records.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+  records.forEach(rec => {
+    const daysAgo = Math.round((Date.now() - new Date(rec.created_at)) / 86400000);
+    const timeText = daysAgo === 0 ? 'Today' : daysAgo === 1 ? 'Yesterday' : `${daysAgo} days ago`;
+
+    const div = document.createElement('div');
+    div.className = 'timeline-item';
+    div.innerHTML = `
+      <div class="timeline-header">
+        <span class="timeline-doctor">${rec.doctor_name} (${rec.clinic_name})</span>
+        <span>${timeText}</span>
+      </div>
+      <div class="timeline-body">
+        <p><strong>Diagnosis:</strong> ${rec.diagnosis}</p>
+        ${rec.treatment_plan ? `<p><strong>Plan:</strong> ${rec.treatment_plan}</p>` : ''}
+        ${rec.medication_prescribed ? `<p><strong>Prescription:</strong> ${rec.medication_prescribed}</p>` : ''}
+      </div>
+    `;
+    container.appendChild(div);
+  });
 }

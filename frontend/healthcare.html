@@ -25,27 +25,61 @@
   <div id="toast-container"></div>
 
   <!-- Header Section -->
-  <header>
-    <div class="header-container">
-      <div class="logo">
+  <header class="site-header">
+    <div class="navbar">
+
+      <!-- Brand -->
+      <a class="navbar-brand" href="index.html">
         <img src="full_logo.png" alt="Thuso Health Logo" class="logo-img">
         <small class="logo-sub">Manager</small>
-      </div>
-      
-      <div class="nav-links">
-        <a href="index.html" class="nav-link"><i class="fa-solid fa-arrow-left"></i> Back to Patient Booking</a>
-      </div>
-      
-      <!-- Network Status Badge -->
-      <div class="status-panel">
-        <div id="connection-badge" class="badge online">
-          <span class="pulse-dot"></span>
-          <span id="connection-text">Online</span>
+      </a>
+
+      <!-- Primary Nav Links (desktop) -->
+      <nav class="navbar-nav" id="navbar-nav">
+        <a href="index.html" class="nav-link nav-link--primary" id="nav-home">
+          <i class="fa-solid fa-house-medical"></i>
+          <span>Home</span>
+        </a>
+        <a href="index.html#clinic-map" class="nav-link nav-link--primary" id="nav-clinics">
+          <i class="fa-solid fa-map-location-dot"></i>
+          <span>Nearby Clinics</span>
+        </a>
+        <a href="index.html#passport-patient-name" class="nav-link nav-link--primary" id="nav-profile">
+          <i class="fa-solid fa-circle-user"></i>
+          <span>View Profile</span>
+        </a>
+        <a href="index.html#notify-meds" class="nav-link nav-link--primary" id="nav-settings">
+          <i class="fa-solid fa-gear"></i>
+          <span>Settings</span>
+        </a>
+      </nav>
+
+      <!-- Right rail -->
+      <div class="navbar-right">
+
+        <!-- Back to patient portal link -->
+        <a href="index.html" class="nav-link">
+          <i class="fa-solid fa-arrow-left"></i>
+          <span>Patient Portal</span>
+        </a>
+
+        <!-- Network Status Badge -->
+        <div class="navbar-status">
+          <span id="connection-badge" class="status-chip status-chip--online">
+            <span class="pulse-dot"></span>
+            <span id="connection-text">Online</span>
+          </span>
+          <button id="sync-btn" class="btn btn-sync btn-sm hidden" title="Sync Offline Operations">
+            <i class="fa-solid fa-arrows-rotate"></i>
+            <span id="sync-count">0</span> Sync
+          </button>
         </div>
-        <button id="sync-btn" class="btn btn-icon btn-sync hidden" title="Sync Offline Operations">
-          <i class="fa-solid fa-arrows-rotate"></i>
-          <span id="sync-count">0</span> Sync
+
+        <!-- Mobile hamburger -->
+        <button class="navbar-hamburger" id="navbar-hamburger" aria-label="Open menu" onclick="document.getElementById('navbar-nav').classList.toggle('nav-open');">
+          <span></span><span></span><span></span>
         </button>
+
       </div>
     </div>
   </header>

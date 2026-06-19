@@ -20,37 +20,87 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <!-- jsPDF Library -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <!-- Leaflet Map (OpenStreetMap — free, no key required) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
 <body class="patient-portal">
   
   <!-- Notification Toast Container -->
   <div id="toast-container"></div>
 
+  <!-- Government Strip -->
+  <div class="gov-strip-bar">
+    <span>🇿🇦 Republic of South Africa</span>
+    <span class="gov-strip-sep">|</span>
+    <span>Gauteng Department of Health</span>
+    <span class="gov-strip-sep">·</span>
+    <span class="gov-strip-badge">NHI Aligned</span>
+    <span class="gov-strip-badge">POPIA Compliant</span>
+    <a href="landing.html" class="gov-strip-home">← Home</a>
+  </div>
+
+  <!-- Eskom Load Shedding Banner -->
+  <div id="eskom-banner" class="eskom-banner hidden">
+    <i class="fa-solid fa-triangle-exclamation"></i>
+    <span id="eskom-status-text"></span>
+    <a href="#" class="eskom-filter-link" onclick="document.getElementById('pwr-solar')?.click(); showTab('clinics'); return false;">
+      Show solar clinics only →
+    </a>
+  </div>
+
   <!-- ===== PATIENT AUTH MODAL ===== -->
   <div id="patient-auth-modal" class="modal" style="display:flex;">
-    <div class="modal-content" style="max-width:420px;">
-      <div class="modal-header">
-        <h2 id="patient-auth-title">Sign In to Thuso Health</h2>
+    <div class="modal-content auth-modal-content">
+
+      <!-- Modal Brand Header -->
+      <div class="auth-modal-header">
+        <div class="auth-modal-brand">
+          <i class="fa-solid fa-heart-pulse auth-modal-logo-icon"></i>
+          <div>
+            <h2 id="patient-auth-title">Welcome to Thuso Health</h2>
+            <p class="auth-modal-subtitle">Your smart clinic booking companion</p>
+          </div>
+        </div>
       </div>
+
       <div class="modal-body">
         <!-- Auth Tab Switcher -->
-        <div class="auth-tabs" style="display:flex;gap:0.5rem;margin-bottom:1.25rem;">
-          <button id="pt-tab-login" class="btn btn-primary" style="flex:1;" onclick="switchPatientTab('login')">Sign In</button>
-          <button id="pt-tab-register" class="btn btn-sort" style="flex:1;" onclick="switchPatientTab('register')">Create Account</button>
+        <div class="auth-tab-row">
+          <button id="pt-tab-login" class="auth-tab-btn auth-tab-active" onclick="switchPatientTab('login')">
+            <i class="fa-solid fa-right-to-bracket"></i> Sign In
+          </button>
+          <button id="pt-tab-register" class="auth-tab-btn" onclick="switchPatientTab('register')">
+            <i class="fa-solid fa-user-plus"></i> Create Account
+          </button>
+        </div>
+
+        <!-- Error Banner (shared) -->
+        <div id="auth-error-banner" class="auth-error-banner hidden">
+          <i class="fa-solid fa-circle-exclamation"></i>
+          <span id="auth-error-msg">An error occurred.</span>
         </div>
 
         <!-- Login Form -->
         <form id="pt-login-form">
           <div class="form-group">
             <label for="pt-login-email"><i class="fa-regular fa-envelope"></i> Email Address</label>
-            <input type="email" id="pt-login-email" placeholder="you@example.com" required>
+            <input type="email" id="pt-login-email" placeholder="you@example.com" autocomplete="email" required>
           </div>
           <div class="form-group">
             <label for="pt-login-password"><i class="fa-solid fa-lock"></i> Password</label>
-            <input type="password" id="pt-login-password" placeholder="Your password" required>
+            <div class="password-input-wrap">
+              <input type="password" id="pt-login-password" placeholder="Your password" autocomplete="current-password" required>
+              <button type="button" class="btn-toggle-pw" tabindex="-1" onclick="togglePwVisibility('pt-login-password', this)">
+                <i class="fa-regular fa-eye"></i>
+              </button>
+            </div>
           </div>
-          <button type="submit" class="btn btn-primary btn-block">Sign In</button>
-          <p style="font-size:0.75rem;color:var(--text-muted);text-align:center;margin-top:0.75rem;">
+          <button type="submit" id="btn-pt-login" class="btn btn-primary btn-block">
+            <i class="fa-solid fa-right-to-bracket"></i> Sign In
+          </button>
+          <p class="auth-demo-hint">
+            <i class="fa-solid fa-circle-info"></i>
             Demo: <strong>paseka@thuso.health</strong> / <strong>password123</strong>
           </p>
         </form>
@@ -59,161 +109,327 @@
         <form id="pt-register-form" class="hidden">
           <div class="form-group">
             <label for="pt-reg-name"><i class="fa-regular fa-user"></i> Full Name</label>
-            <input type="text" id="pt-reg-name" placeholder="Thabo Nkosi" required>
+            <input type="text" id="pt-reg-name" placeholder="Thabo Nkosi" autocomplete="name" required>
           </div>
           <div class="form-group">
             <label for="pt-reg-email"><i class="fa-regular fa-envelope"></i> Email Address</label>
-            <input type="email" id="pt-reg-email" placeholder="thabo@example.com" required>
+            <input type="email" id="pt-reg-email" placeholder="thabo@example.com" autocomplete="email" required>
           </div>
           <div class="form-group">
             <label for="pt-reg-phone"><i class="fa-solid fa-phone"></i> Phone Number</label>
-            <input type="tel" id="pt-reg-phone" placeholder="+27 82 000 0000">
+            <input type="tel" id="pt-reg-phone" placeholder="+27 82 000 0000" autocomplete="tel">
           </div>
           <div class="form-group">
             <label for="pt-reg-password"><i class="fa-solid fa-lock"></i> Create Password</label>
-            <input type="password" id="pt-reg-password" placeholder="Min 6 characters" required>
+            <div class="password-input-wrap">
+              <input type="password" id="pt-reg-password" placeholder="Min 6 characters" autocomplete="new-password" required>
+              <button type="button" class="btn-toggle-pw" tabindex="-1" onclick="togglePwVisibility('pt-reg-password', this)">
+                <i class="fa-regular fa-eye"></i>
+              </button>
+            </div>
           </div>
-          <button type="submit" class="btn btn-primary btn-block">Create My Health Account</button>
+          <button type="submit" id="btn-pt-register" class="btn btn-primary btn-block">
+            <i class="fa-solid fa-user-plus"></i> Create My Health Account
+          </button>
         </form>
       </div>
     </div>
   </div>
 
   <!-- Header Section -->
-  <header>
-    <div class="header-container">
-      <div class="logo">
-        <img src="full_logo.png" alt="Thuso Health Logo" class="logo-img">
-      </div>
-      
-      <div class="nav-links">
-        <span id="patient-greeting" style="font-size:0.8rem;font-weight:600;color:var(--text-main);display:none;">
-          <i class="fa-solid fa-circle-user"></i> <span id="patient-greeting-name"></span>
-        </span>
-        <a href="healthcare.html" class="nav-link"><i class="fa-solid fa-user-doctor"></i> Healthcare Providers &rarr;</a>
-        <button id="btn-patient-logout" class="btn btn-cancel" style="font-size:0.75rem;padding:0.3rem 0.6rem;display:none;" title="Sign out">
-          <i class="fa-solid fa-right-from-bracket"></i> Sign Out
-        </button>
-      </div>
-      
-      <!-- Network Status Badge -->
-      <div class="status-panel">
-        <div class="badge zero-rated" title="Thuso Health is zero-rated for data usage on local ISPs">
-          <i class="fa-solid fa-bolt text-warning"></i>
-          <span>Data-Free Active</span>
+  <header class="site-header">
+    <div class="navbar">
+
+      <!-- Brand -->
+      <a class="navbar-brand" href="landing.html">
+        <img src="full_logo.png" alt="Thuso Health" class="logo-img">
+      </a>
+
+      <!-- Primary Nav Links (desktop) -->
+      <nav class="navbar-nav" id="navbar-nav">
+        <a href="#" class="nav-link nav-link--primary nav-link--active" id="nav-clinics" onclick="showTab('clinics'); return false;">
+          <i class="fa-solid fa-map-location-dot"></i>
+          <span>Nearby Clinics</span>
+        </a>
+        <a href="#" class="nav-link nav-link--primary" id="nav-profile" onclick="showTab('profile'); return false;">
+          <i class="fa-solid fa-circle-user"></i>
+          <span>View Profile</span>
+        </a>
+        <a href="#" class="nav-link nav-link--primary" id="nav-settings" onclick="showTab('settings'); return false;">
+          <i class="fa-solid fa-gear"></i>
+          <span>Settings</span>
+        </a>
+      </nav>
+
+      <!-- Right rail -->
+      <div class="navbar-right">
+
+        <!-- Status chips -->
+        <div class="navbar-status">
+          <span class="status-chip status-chip--data" title="Zero-rated on local ISPs">
+            <i class="fa-solid fa-bolt"></i>
+            <span>Data-Free</span>
+          </span>
+          <span id="connection-badge" class="status-chip status-chip--online">
+            <span class="pulse-dot"></span>
+            <span id="connection-text">Online</span>
+          </span>
+          <button id="sync-btn" class="btn btn-sync btn-sm hidden" title="Sync offline operations">
+            <i class="fa-solid fa-arrows-rotate"></i>
+            <span id="sync-count">0</span>
+          </button>
         </div>
-        <div id="connection-badge" class="badge online">
-          <span class="pulse-dot"></span>
-          <span id="connection-text">Online</span>
+
+        <div class="navbar-divider"></div>
+
+        <!-- Providers link -->
+        <a href="healthcare.html" class="nav-link">
+          <i class="fa-solid fa-user-doctor"></i>
+          <span>Providers</span>
+        </a>
+
+        <!-- User section — shown after login -->
+        <div class="navbar-user" id="navbar-user-section">
+          <span id="patient-greeting" class="navbar-greeting" style="display:none;">
+            <i class="fa-solid fa-circle-user"></i>
+            <span id="patient-greeting-name"></span>
+          </span>
+          <button id="btn-patient-logout" class="btn btn-ghost-sm" style="display:none;" title="Sign out">
+            <i class="fa-solid fa-right-from-bracket"></i> Sign out
+          </button>
         </div>
-        <button id="sync-btn" class="btn btn-icon btn-sync hidden" title="Sync Offline Operations">
-          <i class="fa-solid fa-arrows-rotate"></i>
-          <span id="sync-count">0</span> Sync
+
+        <!-- Mobile hamburger -->
+        <button class="navbar-hamburger" id="navbar-hamburger" aria-label="Open menu" onclick="document.getElementById('navbar-nav').classList.toggle('nav-open');">
+          <span></span><span></span><span></span>
         </button>
+
       </div>
     </div>
   </header>
 
   <main class="main-content">
-    
-    <!-- User Simulated Location Bar -->
-    <section class="section location-bar card">
-      <div class="location-header">
-        <div class="title-with-icon">
-          <i class="fa-solid fa-location-crosshairs text-accent"></i>
-          <h2>Your Simulated Location</h2>
-        </div>
-        <span class="subtext">Update your position to compute travel times and rank clinics dynamically</span>
-      </div>
-      <div class="location-selectors">
-        <button class="btn btn-loc active" data-lat="-26.1929" data-lng="28.0328" data-name="Braamfontein">
-          Braamfontein
-        </button>
-        <button class="btn btn-loc" data-lat="-26.1772" data-lng="28.0308" data-name="Parktown">
-          Parktown
-        </button>
-        <button class="btn btn-loc" data-lat="-26.1460" data-lng="28.0371" data-name="Rosebank">
-          Rosebank
-        </button>
-        <button class="btn btn-loc" data-lat="-26.2041" data-lng="28.0473" data-name="JHB Central">
-          JHB CBD
-        </button>
-      </div>
-    </section>
 
-    <!-- Main Columns Grid -->
-    <div class="app-grid">
-      
-      <!-- Left: Clinic Proximity List -->
-      <section class="clinics-section">
-        <div class="section-title-container">
-          <h2>Nearby Health Clinics</h2>
-          <span class="badge badge-info"><span id="clinics-count">0</span> matching</span>
-        </div>
-        
-        <div class="filter-controls card">
-          <div class="search-input-wrapper">
-            <i class="fa-solid fa-magnifying-glass search-icon"></i>
-            <input type="text" id="search-input" placeholder="Search clinics by name or service...">
+    <!-- ═══════════════════════════════════════════════
+         TAB 1 — NEARBY CLINICS
+    ═══════════════════════════════════════════════ -->
+    <div id="tab-clinics" class="tab-panel tab-active">
+
+      <!-- Map Section -->
+      <section class="section location-bar card map-section">
+        <div class="map-top-bar">
+          <div class="title-with-icon">
+            <i class="fa-solid fa-map-location-dot text-accent"></i>
+            <h2>Nearby Clinics</h2>
+            <span id="osm-count-badge" class="osm-badge" style="display:none;"></span>
           </div>
-          <div class="sorting-controls">
-            <span>Sort:</span>
-            <button id="sort-total" class="btn btn-sort active">Best Match (Travel + Queue)</button>
-            <button id="sort-distance" class="btn btn-sort">Proximity</button>
-            <button id="sort-wait" class="btn btn-sort">Shortest Wait</button>
+          <div class="map-location-controls">
+            <span id="location-area-name" class="location-area-label">
+              <i class="fa-solid fa-circle-notch fa-spin"></i> Locating…
+            </span>
+            <button id="btn-use-real-location" class="btn btn-primary btn-sm" title="Capture my current location">
+              <i class="fa-solid fa-crosshairs"></i> My Location
+            </button>
+            <button id="btn-snap-to-location" class="btn btn-map-snap btn-sm" title="Snap map to my position">
+              <i class="fa-solid fa-location-arrow"></i>
+            </button>
           </div>
         </div>
 
-        <div id="clinics-list" class="clinics-list-container">
-          <div class="loading-state">
-            <i class="fa-solid fa-circle-notch fa-spin"></i>
-            <p>Fetching clinics...</p>
+        <div id="clinic-map" class="clinic-map-container"></div>
+
+        <details class="simulated-loc-details">
+          <summary><i class="fa-solid fa-map-pin"></i> Manually pick a location</summary>
+          <div class="location-selectors">
+            <p class="loc-group-label">Gauteng</p>
+            <button class="btn btn-loc" data-lat="-26.2041" data-lng="28.0473" data-name="JHB CBD">JHB CBD</button>
+            <button class="btn btn-loc" data-lat="-26.1929" data-lng="28.0328" data-name="Braamfontein">Braamfontein</button>
+            <button class="btn btn-loc" data-lat="-26.2485" data-lng="27.8538" data-name="Soweto">Soweto</button>
+            <button class="btn btn-loc" data-lat="-25.7479" data-lng="28.2293" data-name="Pretoria CBD">Pretoria</button>
+            <button class="btn btn-loc" data-lat="-26.1074" data-lng="28.0567" data-name="Alexandra">Alexandra</button>
+            <button class="btn btn-loc" data-lat="-26.0067" data-lng="28.1239" data-name="Midrand">Midrand</button>
+            <p class="loc-group-label">Western Cape</p>
+            <button class="btn btn-loc" data-lat="-33.9249" data-lng="18.4241" data-name="Cape Town CBD">Cape Town</button>
+            <button class="btn btn-loc" data-lat="-33.9574" data-lng="18.4717" data-name="Mitchells Plain">Mitchells Plain</button>
+            <button class="btn btn-loc" data-lat="-33.9475" data-lng="18.5651" data-name="Khayelitsha">Khayelitsha</button>
+            <p class="loc-group-label">KwaZulu-Natal</p>
+            <button class="btn btn-loc" data-lat="-29.8587" data-lng="31.0218" data-name="Durban CBD">Durban</button>
+            <button class="btn btn-loc" data-lat="-29.9197" data-lng="30.9665" data-name="Umlazi">Umlazi</button>
+            <button class="btn btn-loc" data-lat="-29.8691" data-lng="30.9831" data-name="Chatsworth">Chatsworth</button>
+            <p class="loc-group-label">Eastern Cape</p>
+            <button class="btn btn-loc" data-lat="-33.0153" data-lng="27.9116" data-name="East London">East London</button>
+            <button class="btn btn-loc" data-lat="-33.9608" data-lng="25.6022" data-name="Port Elizabeth">Gqeberha</button>
+            <p class="loc-group-label">Other Provinces</p>
+            <button class="btn btn-loc" data-lat="-25.8553" data-lng="29.2397" data-name="Nelspruit">Nelspruit</button>
+            <button class="btn btn-loc" data-lat="-28.7282" data-lng="24.7499" data-name="Kimberley">Kimberley</button>
+            <button class="btn btn-loc" data-lat="-29.1179" data-lng="26.2140" data-name="Bloemfontein">Bloemfontein</button>
+            <button class="btn btn-loc" data-lat="-22.9068" data-lng="30.4590" data-name="Polokwane">Polokwane</button>
           </div>
+        </details>
+
+        <div class="map-legend">
+          <span class="legend-title">Map key</span>
+          <span class="legend-item"><span class="legend-dot legend-dot--you"></span>You</span>
+          <span class="legend-sep">·</span>
+          <span class="legend-item"><span class="legend-pin legend-pin--green"></span>&lt; 30 min wait</span>
+          <span class="legend-item"><span class="legend-pin legend-pin--amber"></span>30–60 min</span>
+          <span class="legend-item"><span class="legend-pin legend-pin--red"></span>&gt; 60 min</span>
+          <span class="legend-sep">·</span>
+          <span class="legend-item"><span class="legend-osm legend-osm--hospital">🏥</span>Hospital</span>
+          <span class="legend-item"><span class="legend-osm legend-osm--doctors">👨‍⚕️</span>GP / Doctor</span>
+          <span class="legend-item"><span class="legend-osm legend-osm--pharmacy">💊</span>Pharmacy</span>
+          <span class="legend-item"><span class="legend-osm legend-osm--clinic">🏨</span>Clinic</span>
         </div>
       </section>
 
-      <!-- Right: Active Booking & Queue Ticket -->
-      <section class="queue-section">
-        <div class="section-title-container">
-          <h2>Your Active Queue Ticket</h2>
-        </div>
-        
-        <div id="active-booking-panel" class="card active-booking-card empty">
-          <div class="empty-state">
-            <i class="fa-solid fa-ticket-simple"></i>
-            <h3>No Ticket Active</h3>
-            <p>Please select a clinic on the left, check power status/wait time, and reserve your slot.</p>
-          </div>
-        </div>
+      <!-- Clinic List + Active Ticket -->
+      <div class="app-grid">
 
-        <div class="section-title-container margin-top">
-          <h2>Recent Bookings</h2>
-        </div>
-        <div class="card history-card">
-          <div id="bookings-history" class="history-list">
-            <div class="empty-history">
-              <p>No recent bookings.</p>
+        <section class="clinics-section">
+          <div class="section-title-container">
+            <h2>Nearby Health Clinics</h2>
+            <span class="badge badge-info"><span id="clinics-count">0</span> matching</span>
+          </div>
+          <div class="filter-controls card">
+            <div class="search-input-wrapper">
+              <i class="fa-solid fa-magnifying-glass search-icon"></i>
+              <input type="text" id="search-input" placeholder="Search clinics by name or service...">
+            </div>
+            <div class="filter-row">
+              <div class="sorting-controls">
+                <span>Sort:</span>
+                <button id="sort-total" class="btn btn-sort active">Best Match</button>
+                <button id="sort-distance" class="btn btn-sort">Proximity</button>
+                <button id="sort-wait" class="btn btn-sort">Shortest Wait</button>
+              </div>
+              <div class="power-filter-controls">
+                <span>Power:</span>
+                <button id="pwr-all" class="btn btn-power-filter active" data-power="all">
+                  <i class="fa-solid fa-circle-half-stroke"></i> All
+                </button>
+                <button id="pwr-grid" class="btn btn-power-filter" data-power="grid">
+                  <i class="fa-solid fa-bolt"></i> Grid On
+                </button>
+                <button id="pwr-solar" class="btn btn-power-filter" data-power="solar">
+                  <i class="fa-solid fa-sun"></i> Solar
+                </button>
+                <button id="pwr-outage" class="btn btn-power-filter" data-power="outage">
+                  <i class="fa-solid fa-triangle-exclamation"></i> Outage
+                </button>
+              </div>
+            </div>
+            <!-- Radius Slider -->
+            <div class="radius-slider-row">
+              <div class="radius-slider-label">
+                <i class="fa-solid fa-circle-dot"></i>
+                <span>Search radius: <strong id="radius-label">10 km</strong></span>
+              </div>
+              <input type="range" id="radius-slider" min="2" max="50" value="10" step="1" class="radius-range">
+              <div class="radius-slider-ends">
+                <span>2 km</span>
+                <span id="osm-count-badge" class="osm-count-badge" style="display:none;"></span>
+                <span>50 km</span>
+              </div>
             </div>
           </div>
-        </div>
+          <div id="clinics-list" class="clinics-list-container">
+            <div class="loading-state">
+              <i class="fa-solid fa-circle-notch fa-spin"></i>
+              <p>Fetching clinics...</p>
+            </div>
+          </div>
+        </section>
 
-        <div class="section-title-container margin-top">
+        <section class="queue-section">
+          <div class="section-title-container">
+            <h2>Your Active Queue Ticket</h2>
+          </div>
+          <div id="active-booking-panel" class="card active-booking-card empty">
+            <div class="empty-state">
+              <i class="fa-solid fa-ticket-simple"></i>
+              <h3>No Ticket Active</h3>
+              <p>Select a clinic on the left and reserve your slot to join the queue.</p>
+            </div>
+          </div>
+
+          <div class="section-title-container margin-top">
+            <h2>Recent Bookings</h2>
+          </div>
+          <div class="card history-card">
+            <div id="bookings-history" class="history-list">
+              <div class="empty-history"><p>No recent bookings.</p></div>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </div><!-- /tab-clinics -->
+
+
+    <!-- ═══════════════════════════════════════════════
+         TAB 2 — VIEW PROFILE
+    ═══════════════════════════════════════════════ -->
+    <div id="tab-profile" class="tab-panel">
+      <div class="tab-content-wrap">
+
+        <div class="section-title-container">
           <h2>Digital Health Passport</h2>
         </div>
-        <div class="card passport-card">
-          <div class="passport-header-flex">
-            <div class="passport-details">
-              <span class="passport-badge"><i class="fa-solid fa-passport"></i> Health Passport</span>
-              <h3 id="passport-patient-name">Loading...</h3>
-              <p>ThusoID: <span id="passport-thuso-id" class="passport-id">—</span></p>
+
+        <!-- Physical ID Card -->
+        <div class="id-card">
+          <!-- SA flag stripe -->
+          <div class="id-card-flag-stripe">
+            <span class="fc-green"></span>
+            <span class="fc-gold"></span>
+            <span class="fc-red"></span>
+            <span class="fc-blue"></span>
+            <span class="fc-white"></span>
+          </div>
+
+          <!-- Card Header -->
+          <div class="id-card-header">
+            <div class="id-card-brand">
+              <i class="fa-solid fa-heart-pulse"></i>
+              <span>Thuso Health</span>
             </div>
-            <div class="passport-qr-container">
-              <div id="passport-qr-canvas" class="passport-qr-mock"></div>
-              <span style="font-size: 0.65rem; color: var(--text-muted); font-weight: 600;">Scan to Share</span>
+            <div class="id-card-header-right">
+              <span class="id-card-nhi-badge">NHI</span>
+              <span class="id-card-popia-badge"><i class="fa-solid fa-shield-halved"></i> POPIA</span>
             </div>
           </div>
 
-          <!-- POPIA Consent configuration -->
+          <!-- Chip + QR row -->
+          <div class="id-card-mid">
+            <div class="id-card-chip">
+              <div class="chip-inner"></div>
+            </div>
+            <div class="id-card-qr">
+              <div id="passport-qr-canvas" class="passport-qr-mock"></div>
+              <span class="id-card-qr-label">SCAN TO SHARE</span>
+            </div>
+          </div>
+
+          <!-- Patient Info -->
+          <div class="id-card-info-row">
+            <div class="id-card-patient">
+              <div class="id-card-field-label">PATIENT NAME</div>
+              <div class="id-card-name" id="passport-patient-name">Loading...</div>
+              <div class="id-card-field-label" style="margin-top:0.35rem;">THUSO ID</div>
+              <div class="id-card-idnum" id="passport-thuso-id">—</div>
+            </div>
+            <div class="id-card-type-col">
+              <span class="id-card-type-label"><i class="fa-solid fa-passport"></i><br>Digital<br>Health<br>Passport</span>
+            </div>
+          </div>
+
+          <!-- Decorative circles -->
+          <div class="id-card-deco id-card-deco-1"></div>
+          <div class="id-card-deco id-card-deco-2"></div>
+        </div>
+
+        <!-- Controls below card -->
+        <div class="card passport-controls-card">
           <div class="consent-controls">
             <div class="consent-row">
               <div class="consent-label-with-icon">
@@ -232,26 +448,9 @@
               </div>
               <span id="consent-pin-code" class="consent-pin-display">1234</span>
             </div>
-            <div class="consent-row">
-              <div class="consent-label-with-icon">
-                <i class="fa-solid fa-language"></i>
-                <span>Preferred Language</span>
-              </div>
-              <div class="language-selector-wrapper">
-                <select id="passport-lang-select">
-                  <option value="en">English</option>
-                  <option value="zulu">isiZulu</option>
-                  <option value="sesotho">Sesotho</option>
-                  <option value="xhosa">isiXhosa</option>
-                  <option value="afrikaans">Afrikaans</option>
-                </select>
-              </div>
-            </div>
           </div>
 
-          <!-- Medical records history timeline -->
           <div class="records-timeline" id="passport-records-timeline">
-            <!-- Populated dynamically -->
             <div class="empty-state" style="padding: 1rem 0;">
               <i class="fa-solid fa-notes-medical"></i>
               <h3>No Medical Records</h3>
@@ -259,27 +458,32 @@
             </div>
           </div>
 
-          <!-- PDF generation trigger -->
           <button id="download-passport-btn" class="btn btn-primary btn-block">
             <i class="fa-solid fa-file-arrow-down"></i> Download Health Passport (PDF)
           </button>
 
-          <!-- Audit Logs toggle and container -->
           <div class="audit-log-toggle-container">
             <button class="audit-log-toggle" id="toggle-audit-logs">
               <i class="fa-solid fa-angle-right"></i> View Access Audit Logs (POPIA)
             </button>
           </div>
-          <div class="audit-log-container hidden" id="audit-logs-list">
-            <!-- Filled dynamically -->
-          </div>
+          <div class="audit-log-container hidden" id="audit-logs-list"></div>
         </div>
 
-        <!-- Opt-in Reminders Settings Card -->
-        <div class="section-title-container margin-top">
-          <h2>Opt-in Notifications</h2>
+      </div>
+    </div><!-- /tab-profile -->
+
+
+    <!-- ═══════════════════════════════════════════════
+         TAB 3 — SETTINGS
+    ═══════════════════════════════════════════════ -->
+    <div id="tab-settings" class="tab-panel">
+      <div class="tab-content-wrap">
+
+        <div class="section-title-container">
+          <h2>Notifications</h2>
         </div>
-        <div class="card">
+        <div class="card" style="margin-bottom: 1.5rem;">
           <div class="consent-row" style="margin-bottom: 0.75rem;">
             <div class="consent-label-with-icon">
               <i class="fa-regular fa-bell"></i>
@@ -301,10 +505,67 @@
             </label>
           </div>
         </div>
-      </section>
-      
-    </div>
+
+        <div class="section-title-container">
+          <h2>Language Preference</h2>
+        </div>
+        <div class="card" style="margin-bottom: 1.5rem;">
+          <div class="consent-row">
+            <div class="consent-label-with-icon">
+              <i class="fa-solid fa-language"></i>
+              <span>Preferred Language</span>
+            </div>
+            <div class="language-selector-wrapper">
+              <select id="passport-lang-select">
+                <option value="en">English</option>
+                <option value="zulu">isiZulu</option>
+                <option value="sesotho">Sesotho</option>
+                <option value="xhosa">isiXhosa</option>
+                <option value="afrikaans">Afrikaans</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="section-title-container">
+          <h2>About Thuso Health</h2>
+        </div>
+        <div class="card">
+          <p style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.7;">
+            Thuso Health is a zero-rated, offline-resilient clinic booking platform for Gauteng Province —
+            built to reduce wait times and connect patients to the nearest available healthcare facility.
+          </p>
+          <div style="margin-top: 1rem; display: flex; gap: 0.5rem; flex-wrap: wrap;">
+            <span class="status-chip" style="background:#d1fae5;color:#065f46;"><i class="fa-solid fa-shield-halved"></i> POPIA Compliant</span>
+            <span class="status-chip" style="background:#eff6ff;color:#1e40af;"><i class="fa-solid fa-wifi"></i> Offline Ready</span>
+            <span class="status-chip" style="background:#fef9c3;color:#854d0e;"><i class="fa-solid fa-bolt"></i> Zero-Rated Data</span>
+          </div>
+          <p style="margin-top: 1rem; font-size: 0.75rem; color: var(--text-muted);">
+            v2.0.0 &nbsp;·&nbsp; Built for Gauteng Province Hackathon 2026 &nbsp;·&nbsp;
+            <a href="healthcare.html" style="color: var(--color-primary);">Provider Login →</a>
+          </p>
+        </div>
+
+      </div>
+    </div><!-- /tab-settings -->
+
   </main>
+
+  <!-- Mobile Bottom Tab Bar -->
+  <nav class="mobile-tab-bar" id="mobile-tab-bar">
+    <button class="mob-tab-btn mob-tab-active" id="mob-tab-clinics" onclick="showTab('clinics')">
+      <i class="fa-solid fa-map-location-dot"></i>
+      <span>Clinics</span>
+    </button>
+    <button class="mob-tab-btn" id="mob-tab-profile" onclick="showTab('profile')">
+      <i class="fa-solid fa-circle-user"></i>
+      <span>Profile</span>
+    </button>
+    <button class="mob-tab-btn" id="mob-tab-settings" onclick="showTab('settings')">
+      <i class="fa-solid fa-gear"></i>
+      <span>Settings</span>
+    </button>
+  </nav>
 
   <!-- Booking Modal -->
   <div id="booking-modal" class="modal">
@@ -347,12 +608,12 @@
 
           <div class="form-group">
             <label for="patient-name"><i class="fa-regular fa-user"></i> Patient Name</label>
-            <input type="text" id="patient-name" value="Paseka Moloi" required>
+            <input type="text" id="patient-name" placeholder="Your full name" required>
           </div>
 
           <div class="form-group">
             <label for="patient-phone"><i class="fa-solid fa-phone"></i> Contact Phone</label>
-            <input type="text" id="patient-phone" value="+27 82 123 4567" required>
+            <input type="text" id="patient-phone" placeholder="+27 82 000 0000" required>
           </div>
 
           <div class="booking-advice">
@@ -366,11 +627,21 @@
     </div>
   </div>
 
-  <footer>
-    <div class="footer-container">
-      <p>&copy; 2026 Thuso Health. Solving medical queues offline and online.</p>
-    </div>
-  </footer>
+  <!-- WhatsApp Floating Button -->
+  <a href="https://wa.me/14155238886?text=join%20eleven-private"
+     id="wa-fab"
+     class="wa-fab"
+     target="_blank"
+     rel="noopener"
+     title="Book on WhatsApp — it's free!">
+    <svg class="wa-fab-icon" viewBox="0 0 24 24" fill="currentColor" width="28" height="28">
+      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
+      <path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.555 4.116 1.529 5.845L0 24l6.335-1.505A11.946 11.946 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.818 9.818 0 01-5.006-1.374l-.359-.214-3.722.884.912-3.628-.234-.373A9.761 9.761 0 012.182 12C2.182 6.578 6.578 2.182 12 2.182c5.421 0 9.818 4.396 9.818 9.818 0 5.421-4.397 9.818-9.818 9.818z"/>
+    </svg>
+    <span class="wa-fab-label">WhatsApp</span>
+  </a>
+
+
 
   <!-- Application Logic -->
   <script src="app.js"></script>

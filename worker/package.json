@@ -1,0 +1,20 @@
+{
+  "name": "thuso-health-api",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:create": "wrangler d1 create thuso-health-db",
+    "db:schema": "wrangler d1 execute thuso-health-db --file=./schema.sql",
+    "db:schema:local": "wrangler d1 execute thuso-health-db --local --file=./schema.sql",
+    "db:seed": "echo 'After deploying, call: curl -X POST https://YOUR_WORKER_URL/api/admin/seed?secret=YOUR_SEED_SECRET'"
+  },
+  "dependencies": {
+    "hono": "^4.7.0"
+  },
+  "devDependencies": {
+    "wrangler": "^4.102.0"
+  }
+}

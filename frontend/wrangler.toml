@@ -1,0 +1,13 @@
+# Thuso Health — Cloudflare Pages (Frontend)
+# ─────────────────────────────────────────────────────────────────────────────
+# DEPLOY STEPS:
+#  1. cd frontend
+#  2. wrangler pages deploy . --project-name=thuso-health
+#     (First run creates the project; subsequent runs update it)
+#
+# OR: Connect your GitHub repo in Cloudflare Dashboard → Pages → Create Project
+#     Set the build output directory to: frontend
+# ─────────────────────────────────────────────────────────────────────────────
+
+name = "thuso-health"
+pages_build_output_dir = "."

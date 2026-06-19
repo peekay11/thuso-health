@@ -1,9 +1,40 @@
 // Thuso Health Application State & Business Logic (Dual-Portal System)
 
+// ─── DEPLOYMENT CONFIG ───────────────────────────────────────────────────────
+// After running `wrangler deploy` in the worker/ directory, replace the URL
+// below with your actual Worker URL shown in the deploy output.
+const WORKER_URL = 'https://thuso-health-api.pasekamabitsela22.workers.dev';
+
 const CONFIG = {
-  API_BASE: 'http://localhost:5000/api',
+  API_BASE: (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+    ? 'http://localhost:8787/api'      // local wrangler dev server (cd worker && npm run dev)
+    : `${WORKER_URL}/api`,            // Cloudflare Worker (production)
   SERVER_PING_INTERVAL_MS: 5000
 };
+
+// ─── JWT TOKEN MANAGEMENT ────────────────────────────────────────────────────
+function getAuthToken() {
+  return localStorage.getItem('thuso_jwt_token');
+}
+
+function setAuthToken(token) {
+  if (token) {
+    localStorage.setItem('thuso_jwt_token', token);
+  } else {
+    localStorage.removeItem('thuso_jwt_token');
+  }
+}
+
+// authFetch: wraps fetch() with the JWT Authorization header automatically
+async function authFetch(url, options = {}) {
+  const token = getAuthToken();
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    ...(options.headers || {})
+  };
+  return fetch(url, { ...options, headers });
+}
 
 // Application State
 const state = {
@@ -29,78 +60,661 @@ const state = {
   offlineQueueUpdates: [],
   offlineClinicSettings: null,
   
-  sortBy: 'totalTime'
+  sortBy: 'totalTime',
+  powerFilter: 'all',  // 'all' | 'grid' | 'solar' | 'outage'
+  searchRadius: 10,    // km — controlled by the radius slider
+  osmFacilities: []    // OSM-discovered facilities (directions-only, not in D1)
 };
 
-// Local Offline Fallback Database
-const MOCK_CLINICS = [
-  {
-    id: "c1",
-    name: "Thuso Health Central Clinic",
-    address: "26 Jorissen St, Braamfontein, Johannesburg, 2001",
-    lat: -26.1929,
-    lng: 28.0328,
-    baseWaitTimeMinutes: 45,
-    currentQueueCount: 12,
-    services: ["General Practitioner", "Dentistry", "Pediatrics", "Vaccinations"],
-    operatingHours: "08:00 - 17:00",
-    capacityPerDay: 80,
-    hasElectricity: true,
-    hasSolar: false,
-    openTime: "08:00",
-    closeTime: "17:00"
-  },
-  {
-    id: "c2",
-    name: "Hillbrow Community Health Centre",
-    address: "Smith St & Klein St, Hillbrow, Johannesburg, 2001",
-    lat: -26.1884,
-    lng: 28.0443,
-    baseWaitTimeMinutes: 90,
-    currentQueueCount: 28,
-    services: ["General Practitioner", "HIV/AIDS Care", "Maternity", "Pharmacy"],
-    operatingHours: "24 Hours",
-    capacityPerDay: 150,
-    hasElectricity: false,
-    hasSolar: false,
-    openTime: "00:00",
-    closeTime: "23:59"
-  },
-  {
-    id: "c3",
-    name: "Parktown Medical Centre",
-    address: "15 Princess of Wales Terrace, Parktown, Johannesburg, 2193",
-    lat: -26.1772,
-    lng: 28.0308,
-    baseWaitTimeMinutes: 20,
-    currentQueueCount: 3,
-    services: ["General Practitioner", "Physiotherapy", "Optometry"],
-    operatingHours: "08:00 - 18:00",
-    capacityPerDay: 40,
-    hasElectricity: true,
-    hasSolar: true,
-    openTime: "08:00",
-    closeTime: "18:00"
-  },
-  {
-    id: "c4",
-    name: "Rosebank Health Clinic",
-    address: "50 Bath Ave, Rosebank, Johannesburg, 2196",
-    lat: -26.1460,
-    lng: 28.0371,
-    baseWaitTimeMinutes: 15,
-    currentQueueCount: 2,
-    services: ["General Practitioner", "Travel Clinic", "Dermatology"],
-    operatingHours: "09:00 - 17:00",
-    capacityPerDay: 30,
-    hasElectricity: true,
-    hasSolar: true,
-    openTime: "09:00",
-    closeTime: "17:00"
+// ─── MAP STATE ──────────────────────────────────────────────────────────────
+let map = null;
+let userMarker = null;
+let osmLayerGroup = null;   // OSM-discovered facilities (background layer)
+let clinicLayerGroup = null; // Our D1 bookable clinics (top layer)
+
+// ─── MAP INITIALISATION ──────────────────────────────────────────────────────
+
+function initMap() {
+  const container = document.getElementById('clinic-map');
+  if (!container || map) return; // already initialised
+
+  map = L.map('clinic-map', { zoomControl: true, attributionControl: false }).setView(
+    [state.userLocation.lat, state.userLocation.lng], 13
+  );
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '© OpenStreetMap'
+  }).addTo(map);
+
+  L.control.attribution({ prefix: false }).addAttribution('© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>').addTo(map);
+
+  osmLayerGroup = L.layerGroup().addTo(map);   // added first = renders below
+  clinicLayerGroup = L.layerGroup().addTo(map); // added second = renders on top
+
+  // Place user marker immediately at the current location
+  placeUserMarker(state.userLocation.lat, state.userLocation.lng);
+
+  // Render any clinics already loaded
+  if (state.clinics.length > 0) updateMapClinicMarkers();
+}
+
+function placeUserMarker(lat, lng) {
+  if (!map) return;
+  const icon = L.divIcon({
+    className: '',
+    html: '<div class="user-dot"></div>',
+    iconSize: [16, 16],
+    iconAnchor: [8, 8]
+  });
+  if (userMarker) {
+    userMarker.setLatLng([lat, lng]);
+  } else {
+    userMarker = L.marker([lat, lng], { icon, zIndexOffset: 1000 }).addTo(map);
+    userMarker.bindPopup('<div class="clinic-popup"><h4>You are here</h4></div>');
   }
+}
+
+function updateMapClinicMarkers() {
+  if (!map || !clinicLayerGroup) return;
+  clinicLayerGroup.clearLayers();
+
+  state.clinics.forEach(c => {
+    if (!c.lat || !c.lng) return;
+
+    const wait = c.estimatedWaitTimeMinutes || 0;
+    let pinColor, waitClass;
+    if (wait < 30)       { pinColor = '#22c55e'; waitClass = 'wait-green'; }
+    else if (wait <= 60) { pinColor = '#f59e0b'; waitClass = 'wait-amber'; }
+    else                 { pinColor = '#ef4444'; waitClass = 'wait-red'; }
+
+    const icon = L.divIcon({
+      className: '',
+      html: `<div class="clinic-pin">
+               <div class="clinic-pin-head" style="background:${pinColor};">
+                 <span>${wait}<br>min</span>
+               </div>
+             </div>`,
+      iconSize: [38, 46],
+      iconAnchor: [19, 46],
+      popupAnchor: [0, -46]
+    });
+
+    const power = c.hasElectricity
+      ? '<span class="popup-stat"><i>⚡</i> Grid</span>'
+      : c.hasSolar
+        ? '<span class="popup-stat"><i>☀️</i> Solar</span>'
+        : '<span class="popup-stat" style="background:#fee2e2;color:#991b1b;"><i>⚠️</i> Outage</span>';
+
+    const popupHtml = `
+      <div class="clinic-popup">
+        <h4>${c.name}</h4>
+        <p class="popup-address"><i class="fa-solid fa-location-dot"></i> ${c.address}</p>
+        <div class="popup-stats">
+          <span class="popup-stat"><i>🚗</i> ${c.distanceKm} km · ${c.travelTimeMinutes} min</span>
+          <span class="popup-stat ${waitClass}"><i>⏱</i> ${wait} min wait</span>
+          ${power}
+        </div>
+        <button class="popup-book-btn" onclick="openBookingModal('${c.id}');map.closePopup();">
+          Book My Slot →
+        </button>
+      </div>`;
+
+    L.marker([c.lat, c.lng], { icon })
+      .addTo(clinicLayerGroup)
+      .bindPopup(popupHtml, { maxWidth: 260 });
+  });
+}
+
+// ─── OVERPASS / OSM FACILITY DISCOVERY ───────────────────────────────────────
+
+async function fetchOSMClinics(lat, lng, radiusM = 8000) {
+  const q = `
+[out:json][timeout:25];
+(
+  node["amenity"~"^(hospital|clinic|doctors|health_centre|pharmacy)$"](around:${radiusM},${lat},${lng});
+  node["healthcare"](around:${radiusM},${lat},${lng});
+  way["amenity"~"^(hospital|clinic|doctors|health_centre|pharmacy)$"](around:${radiusM},${lat},${lng});
+  way["healthcare"](around:${radiusM},${lat},${lng});
+);
+out center tags;`;
+  try {
+    const res = await fetch('https://overpass-api.de/api/interpreter', {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: q
+    });
+    const data = await res.json();
+    return data.elements || [];
+  } catch (e) {
+    console.warn('Overpass API error:', e);
+    return [];
+  }
+}
+
+function updateOSMMarkers(elements) {
+  if (!map || !osmLayerGroup) return;
+  osmLayerGroup.clearLayers();
+  state.osmFacilities = [];
+
+  const seen = new Set();
+
+  elements.forEach(el => {
+    const lat = el.lat ?? el.center?.lat;
+    const lng = el.lon ?? el.center?.lon;
+    if (!lat || !lng) return;
+
+    // Deduplicate by rounded position
+    const key = `${lat.toFixed(4)},${lng.toFixed(4)}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+
+    // Skip if within 200m of one of our D1 clinics (already has a proper pin)
+    const overlapsOurs = state.clinics.some(c =>
+      Math.abs(c.lat - lat) < 0.0018 && Math.abs(c.lng - lng) < 0.0018
+    );
+    if (overlapsOurs) return;
+
+    const tags = el.tags || {};
+    const name = tags.name || tags['name:en'] || 'Healthcare Facility';
+    const type = tags.amenity || tags.healthcare || 'clinic';
+    const addr = [tags['addr:housenumber'], tags['addr:street'], tags['addr:suburb'] || tags['addr:city']]
+      .filter(Boolean).join(' ') || tags['addr:full'] || tags['is_in'] || '';
+    const phone = tags.phone || tags['contact:phone'] || '';
+    const hours = tags.opening_hours || '';
+
+    // Compute haversine distance for list rendering
+    const { distanceKm } = calculateDistanceAndDuration
+      ? calculateDistanceAndDuration(state.userLocation.lat, state.userLocation.lng, lat, lng)
+      : { distanceKm: 0 };
+
+    // Store in state for list rendering
+    state.osmFacilities.push({ id: `osm-${el.id}`, name, type, addr, phone, hours, lat, lng, distanceKm });
+
+    const emoji = type === 'hospital' ? '🏥'
+      : type === 'pharmacy' ? '💊'
+      : type === 'doctors' ? '👨‍⚕️'
+      : '🏨';
+
+    const icon = L.divIcon({
+      className: '',
+      html: `<div class="osm-pin osm-pin--${type}">${emoji}</div>`,
+      iconSize: [30, 30],
+      iconAnchor: [15, 15],
+      popupAnchor: [0, -18]
+    });
+
+    const mapsUrl = `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}&zoom=17`;
+    const popup = `
+      <div class="clinic-popup">
+        <h4>${name}</h4>
+        ${addr ? `<p class="popup-address"><i class="fa-solid fa-location-dot"></i> ${addr}</p>` : ''}
+        <div class="popup-stats">
+          <span class="popup-stat">${emoji} ${type.replace(/_/g,' ')}</span>
+          ${phone ? `<span class="popup-stat">📞 ${phone}</span>` : ''}
+          ${hours ? `<span class="popup-stat">🕐 ${hours}</span>` : ''}
+        </div>
+        <a href="${mapsUrl}" target="_blank" rel="noopener"
+           style="display:block;width:100%;padding:0.45rem;font-size:0.78rem;font-weight:700;font-family:var(--font-heading,sans-serif);background:#475569;color:#fff;border:none;border-radius:8px;text-align:center;text-decoration:none;margin-top:0.5rem;">
+          View on OpenStreetMap →
+        </a>
+      </div>`;
+
+    L.marker([lat, lng], { icon })
+      .addTo(osmLayerGroup)
+      .bindPopup(popup, { maxWidth: 270 });
+  });
+
+  // Update OSM count badge in the UI
+  const badge = document.getElementById('osm-count-badge');
+  if (badge) {
+    const count = seen.size;
+    badge.textContent = `+${count} OSM facilities`;
+    badge.style.display = count > 0 ? 'inline-flex' : 'none';
+  }
+}
+// ─── LOCATION SYSTEM ─────────────────────────────────────────────────────────
+// Strategy for maximum accuracy:
+//   • maximumAge: 0 everywhere — NEVER use a cached/stale position
+//   • Phase 1 – 3-second multi-sample: start watchPosition immediately,
+//     collect readings, show map as soon as we get any fix (or after 3 s with
+//     the best reading collected so far)
+//   • Phase 2 – 30-second background refinement: keep watching, update the
+//     marker and shrink the accuracy circle in real-time
+//   • Live colour coding: red (>100 m) → amber (≤100 m) → green (≤20 m)
+
+const GPS_PHASE1_MS     = 3000;   // show first result after at most this long
+const GPS_REFINE_MS     = 30000;  // keep refining for this long in background
+const GPS_EXCELLENT_M   = 10;     // ≤ this = excellent (circle disappears)
+const GPS_GOOD_M        = 20;     // ≤ this = good (green badge)
+const GPS_FAIR_M        = 100;    // ≤ this = fair (amber badge)
+
+let accuracyCircle   = null;
+let refineWatchId    = null;
+let locationCaptured = false;
+
+/** Draw / update the translucent accuracy circle around the user dot */
+function updateAccuracyCircle(lat, lng, radiusM) {
+  if (!map) return;
+  if (accuracyCircle) {
+    accuracyCircle.setLatLng([lat, lng]);
+    accuracyCircle.setRadius(radiusM);
+  } else {
+    accuracyCircle = L.circle([lat, lng], {
+      radius: radiusM,
+      color: '#4f46e5',
+      fillColor: '#4f46e5',
+      fillOpacity: 0.09,
+      weight: 1.5,
+      dashArray: '4 3'
+    }).addTo(map);
+  }
+}
+
+function _removeAccuracyCircle() {
+  if (accuracyCircle && map) {
+    map.removeLayer(accuracyCircle);
+    accuracyCircle = null;
+  }
+}
+
+/** Update the location label with colour-coded accuracy badge */
+function _updateLocationLabel(label, areaName, accuracyM, source) {
+  if (!label) return;
+  const icon = source === 'gps'  ? 'fa-location-dot'
+             : source === 'wifi' ? 'fa-wifi'
+             : 'fa-map-pin';
+  let accBadge = '';
+  if (accuracyM < 5000) {
+    const cls = accuracyM <= GPS_GOOD_M  ? 'loc-acc--good'
+              : accuracyM <= GPS_FAIR_M  ? 'loc-acc--fair'
+              : 'loc-acc--poor';
+    accBadge = `<span class="loc-accuracy ${cls}">±${Math.round(accuracyM)} m</span>`;
+  }
+  label.innerHTML = `<i class="fa-solid ${icon}"></i> ${areaName}${accBadge}`;
+}
+
+/** Apply a position: update state, map, marker, accuracy circle, clinics, geocode */
+async function applyLocation(lat, lng, accuracyM, label, btn, silent) {
+  state.userLocation = { lat, lng, name: state.userLocation?.name || 'Your Location' };
+  locationCaptured = true;
+
+  placeUserMarker(lat, lng);
+  updateAccuracyCircle(lat, lng, accuracyM);
+  if (map) map.setView([lat, lng], 16);
+
+  await fetchClinics();
+  renderClinicsList();
+  updateMapClinicMarkers();
+  fetchOSMClinics(lat, lng, 15000).then(updateOSMMarkers);
+
+  // Reverse geocode (Nominatim) — non-blocking after first call
+  try {
+    const r = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
+      { headers: { 'Accept-Language': 'en', 'User-Agent': 'ThusoHealth/1.0' } }
+    );
+    const geo = await r.json();
+    const area = geo.address?.suburb || geo.address?.city_district ||
+                 geo.address?.quarter || geo.address?.city ||
+                 geo.address?.town    || geo.address?.village || 'Your Location';
+    state.userLocation.name = area;
+    _updateLocationLabel(label, area, accuracyM, 'gps');
+  } catch {
+    _updateLocationLabel(label, state.userLocation.name, accuracyM, 'gps');
+  }
+
+  if (!silent) showToast('📍 GPS location captured.', 'success');
+  if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-crosshairs"></i> My Location'; }
+}
+
+/** Phase 2 — continuous background refinement (updates marker live) */
+function startBackgroundRefinement(initialAccuracy) {
+  if (refineWatchId !== null) navigator.geolocation.clearWatch(refineWatchId);
+
+  let bestAccuracy = initialAccuracy;
+  const label = document.getElementById('location-area-name');
+  const refineStart = Date.now();
+
+  refineWatchId = navigator.geolocation.watchPosition(
+    (pos) => {
+      const { latitude, longitude, accuracy } = pos.coords;
+      if (accuracy < bestAccuracy) {
+        bestAccuracy = accuracy;
+        state.userLocation.lat = latitude;
+        state.userLocation.lng = longitude;
+        placeUserMarker(latitude, longitude);
+        updateAccuracyCircle(latitude, longitude, accuracy);
+        _updateLocationLabel(label, state.userLocation.name, accuracy, 'gps');
+
+        if (accuracy <= GPS_EXCELLENT_M) {
+          // Perfect fix — stop watching and fade the circle
+          navigator.geolocation.clearWatch(refineWatchId);
+          refineWatchId = null;
+          setTimeout(_removeAccuracyCircle, 1500);
+        }
+      }
+    },
+    (err) => { console.warn('Refinement watch error:', err.message); },
+    {
+      enableHighAccuracy: true,
+      maximumAge: 0,          // ← never use a cached reading
+      timeout: 10000          // per-reading timeout (watchPosition resets per reading)
+    }
+  );
+
+  // Hard stop after GPS_REFINE_MS
+  setTimeout(() => {
+    if (refineWatchId !== null) {
+      navigator.geolocation.clearWatch(refineWatchId);
+      refineWatchId = null;
+    }
+    // Fade circle if still showing after refinement window
+    if (accuracyCircle) setTimeout(_removeAccuracyCircle, 2000);
+  }, GPS_REFINE_MS);
+}
+
+async function ipFallbackLocation(label, btn, silent) {
+  try {
+    const r = await fetch('https://ipapi.co/json/');
+    const d = await r.json();
+    if (d.latitude && d.longitude) {
+      if (!silent) showToast('GPS unavailable — using approximate network location.', 'warning');
+      await applyLocation(d.latitude, d.longitude, 5000, label, btn, true);
+      const city = d.city || d.region || 'Your Area';
+      _updateLocationLabel(label, city, 5000, 'wifi');
+      return;
+    }
+  } catch { /* network error */ }
+  if (!silent) showToast('Could not determine location. Pick one manually.', 'warning');
+  if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-crosshairs"></i> My Location'; }
+  _updateLocationLabel(label, state.userLocation?.name || 'Unknown', Infinity, 'pin');
+}
+
+async function requestRealLocation(silent = false) {
+  const btn   = document.getElementById('btn-use-real-location');
+  const label = document.getElementById('location-area-name');
+  if (btn)   { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i>'; }
+  if (label) label.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Getting exact location…';
+
+  // Stop any previous refinement watch first
+  if (refineWatchId !== null) {
+    navigator.geolocation.clearWatch(refineWatchId);
+    refineWatchId = null;
+  }
+
+  if (!navigator.geolocation) {
+    await ipFallbackLocation(label, btn, silent);
+    return;
+  }
+
+  // ── Phase 1: multi-sample quick fix ──────────────────────────────────────
+  // Start watchPosition immediately (no maximumAge cache), collect readings
+  // for GPS_PHASE1_MS ms, then resolve with the best one seen so far.
+  let phase1Best = null;
+  let phase1WatchId = null;
+
+  try {
+    const phase1Pos = await new Promise((resolve, reject) => {
+      let resolved = false;
+
+      const finish = () => {
+        if (resolved) return;
+        resolved = true;
+        navigator.geolocation.clearWatch(phase1WatchId);
+        if (phase1Best) resolve(phase1Best);
+        else reject(new Error('No position obtained'));
+      };
+
+      phase1WatchId = navigator.geolocation.watchPosition(
+        (pos) => {
+          // Always keep the most accurate reading
+          if (!phase1Best || pos.coords.accuracy < phase1Best.coords.accuracy) {
+            phase1Best = pos;
+          }
+          // Resolve early if we already have an excellent fix
+          if (phase1Best.coords.accuracy <= GPS_GOOD_M) finish();
+        },
+        (err) => {
+          navigator.geolocation.clearWatch(phase1WatchId);
+          if (!resolved) { resolved = true; reject(err); }
+        },
+        {
+          enableHighAccuracy: true,
+          maximumAge: 0,       // ← NEVER use stale cache
+          timeout: 15000       // per-reading timeout
+        }
+      );
+
+      // After GPS_PHASE1_MS, resolve with whatever is best so far
+      setTimeout(finish, GPS_PHASE1_MS);
+    });
+
+    const { latitude, longitude, accuracy } = phase1Pos.coords;
+    await applyLocation(latitude, longitude, accuracy, label, btn, silent);
+
+    // ── Phase 2: keep improving silently ──────────────────────────────────
+    startBackgroundRefinement(accuracy);
+
+  } catch (err) {
+    if (err?.code === 1) {
+      await ipFallbackLocation(label, btn, silent);
+    } else {
+      if (!silent) showToast('GPS timed out — using network location.', 'warning');
+      await ipFallbackLocation(label, btn, true);
+    }
+  }
+}
+
+
+async function autoRequestLocation() {
+  if (!navigator.geolocation) {
+    ipFallbackLocation(
+      document.getElementById('location-area-name'),
+      document.getElementById('btn-use-real-location'),
+      true
+    );
+    return;
+  }
+
+  if (navigator.permissions) {
+    try {
+      const perm = await navigator.permissions.query({ name: 'geolocation' });
+      if (perm.state === 'granted') {
+        // Permission already granted — capture immediately, silently
+        requestRealLocation(true);
+      } else if (perm.state === 'prompt') {
+        // Will show the browser permission prompt — not silent so user sees context
+        requestRealLocation(false);
+      } else {
+        // Denied — fall back to IP, label shows pin icon
+        ipFallbackLocation(
+          document.getElementById('location-area-name'),
+          document.getElementById('btn-use-real-location'),
+          true
+        );
+      }
+      // Listen for permission changes (e.g. user re-grants)
+      perm.addEventListener('change', () => {
+        if (perm.state === 'granted') requestRealLocation(true);
+      });
+    } catch {
+      requestRealLocation(false);
+    }
+  } else {
+    requestRealLocation(false);
+  }
+}
+
+// ─── END MAP FUNCTIONS ───────────────────────────────────────────────────────
+
+// Full SA all-province clinic dataset — used as offline fallback when the API is unavailable.
+const DEMO_CLINICS_SA = [
+  // ── GAUTENG ─────────────────────────────────────────────────────────────
+  { id:'gt-1', name:'Parktown Medical Centre', address:'Jubilee Rd, Parktown, Johannesburg', province:'Gauteng',
+    lat:-26.1932, lng:28.0459, services:['General Practitioner','HIV/AIDS Care','Pharmacy','Vaccinations'],
+    hasElectricity:true, hasSolar:false, operatingHours:'07:30 - 16:30', capacityPerDay:80, baseWaitTimeMinutes:25 },
+  { id:'gt-2', name:'Soweto Community Health Centre', address:'Immink Dr, Jabulani, Soweto', province:'Gauteng',
+    lat:-26.2485, lng:27.8546, services:['General Practitioner','Pediatrics','Dentistry','Vaccinations'],
+    hasElectricity:true, hasSolar:true, operatingHours:'07:00 - 19:00', capacityPerDay:120, baseWaitTimeMinutes:40 },
+  { id:'gt-3', name:'Alexandra Community Clinic', address:'Pan Africa Shopping Centre, Alexandra', province:'Gauteng',
+    lat:-26.1065, lng:28.1134, services:['General Practitioner','HIV/AIDS Care','Pharmacy'],
+    hasElectricity:false, hasSolar:true, operatingHours:'08:00 - 17:00', capacityPerDay:60, baseWaitTimeMinutes:35 },
+  { id:'gt-4', name:'Tshwane District Hospital', address:'Dr Savage Rd, Pretoria Central', province:'Gauteng',
+    lat:-25.7461, lng:28.1881, services:['General Practitioner','Pediatrics','Dentistry','Pharmacy','HIV/AIDS Care'],
+    hasElectricity:true, hasSolar:false, operatingHours:'00:00 - 23:59', capacityPerDay:200, baseWaitTimeMinutes:50 },
+  { id:'gt-5', name:'Lenasia South CHC', address:'Lenasia South Ext 4, Johannesburg', province:'Gauteng',
+    lat:-26.3630, lng:27.8300, services:['General Practitioner','Vaccinations','Pharmacy'],
+    hasElectricity:true, hasSolar:false, operatingHours:'07:30 - 16:00', capacityPerDay:55, baseWaitTimeMinutes:20 },
+
+  // ── WESTERN CAPE ────────────────────────────────────────────────────────
+  { id:'wc-1', name:'Mitchells Plain Community Health Centre', address:'AZ Berman Dr, Mitchells Plain, Cape Town', province:'Western Cape',
+    lat:-34.0483, lng:18.6153, services:['General Practitioner','HIV/AIDS Care','Pediatrics','Pharmacy'],
+    hasElectricity:true, hasSolar:false, operatingHours:'07:30 - 16:30', capacityPerDay:100, baseWaitTimeMinutes:45 },
+  { id:'wc-2', name:'Tygerberg Hospital Outpatient', address:'Francie van Zijl Dr, Bellville, Cape Town', province:'Western Cape',
+    lat:-33.9183, lng:18.6321, services:['General Practitioner','Dentistry','Pediatrics','Pharmacy','Vaccinations'],
+    hasElectricity:true, hasSolar:true, operatingHours:'07:00 - 17:00', capacityPerDay:150, baseWaitTimeMinutes:55 },
+  { id:'wc-3', name:'George Hospital Clinic', address:'York St, George, Western Cape', province:'Western Cape',
+    lat:-33.9648, lng:22.4541, services:['General Practitioner','HIV/AIDS Care','Pharmacy'],
+    hasElectricity:true, hasSolar:false, operatingHours:'08:00 - 16:00', capacityPerDay:60, baseWaitTimeMinutes:30 },
+
+  // ── KWAZULU-NATAL ────────────────────────────────────────────────────────
+  { id:'kzn-1', name:'King Edward VIII Hospital Clinic', address:'Umbilo Rd, Umbilo, Durban', province:'KwaZulu-Natal',
+    lat:-29.8586, lng:30.9836, services:['General Practitioner','HIV/AIDS Care','Pharmacy','Pediatrics'],
+    hasElectricity:true, hasSolar:false, operatingHours:'07:00 - 16:00', capacityPerDay:180, baseWaitTimeMinutes:60 },
+  { id:'kzn-2', name:'Addington District Hospital Clinic', address:'Erskine Terrace, South Beach, Durban', province:'KwaZulu-Natal',
+    lat:-29.8614, lng:31.0484, services:['General Practitioner','Dentistry','Vaccinations'],
+    hasElectricity:true, hasSolar:false, operatingHours:'07:30 - 15:30', capacityPerDay:70, baseWaitTimeMinutes:40 },
+  { id:'kzn-3', name:"Grey's Hospital Outpatient", address:'Pietermaritz St, Pietermaritzburg', province:'KwaZulu-Natal',
+    lat:-29.6006, lng:30.3794, services:['General Practitioner','Pediatrics','HIV/AIDS Care','Pharmacy'],
+    hasElectricity:true, hasSolar:true, operatingHours:'07:00 - 16:30', capacityPerDay:90, baseWaitTimeMinutes:35 },
+
+  // ── EASTERN CAPE ─────────────────────────────────────────────────────────
+  { id:'ec-1', name:'Livingstone Hospital Clinic', address:'Standford Rd, Gqeberha (Port Elizabeth)', province:'Eastern Cape',
+    lat:-33.9660, lng:25.5703, services:['General Practitioner','HIV/AIDS Care','Pharmacy','Pediatrics'],
+    hasElectricity:true, hasSolar:false, operatingHours:'07:30 - 16:00', capacityPerDay:110, baseWaitTimeMinutes:50 },
+  { id:'ec-2', name:'Frere Hospital Community Clinic', address:'Billie Rd, East London', province:'Eastern Cape',
+    lat:-32.9920, lng:27.8742, services:['General Practitioner','Vaccinations','Dentistry'],
+    hasElectricity:false, hasSolar:true, operatingHours:'08:00 - 16:00', capacityPerDay:65, baseWaitTimeMinutes:30 },
+  { id:'ec-3', name:'Nelson Mandela Academic Hospital Clinic', address:'Nelson Mandela Dr, Mthatha', province:'Eastern Cape',
+    lat:-31.5944, lng:28.7903, services:['General Practitioner','HIV/AIDS Care','Pharmacy','Pediatrics'],
+    hasElectricity:true, hasSolar:false, operatingHours:'00:00 - 23:59', capacityPerDay:130, baseWaitTimeMinutes:70 },
+
+  // ── LIMPOPO ──────────────────────────────────────────────────────────────
+  { id:'lp-1', name:'Polokwane Provincial Hospital Clinic', address:'Hospital St, Polokwane', province:'Limpopo',
+    lat:-23.9061, lng:29.4558, services:['General Practitioner','Pharmacy','Pediatrics','HIV/AIDS Care'],
+    hasElectricity:true, hasSolar:false, operatingHours:'07:00 - 16:00', capacityPerDay:100, baseWaitTimeMinutes:45 },
+  { id:'lp-2', name:'Tzaneen Community Health Centre', address:'Tzaneen, Limpopo', province:'Limpopo',
+    lat:-23.8330, lng:30.1616, services:['General Practitioner','Vaccinations','HIV/AIDS Care'],
+    hasElectricity:true, hasSolar:true, operatingHours:'07:30 - 15:30', capacityPerDay:55, baseWaitTimeMinutes:25 },
+
+  // ── MPUMALANGA ───────────────────────────────────────────────────────────
+  { id:'mp-1', name:'Rob Ferreira Hospital Clinic', address:'Ferreira St, Mbombela (Nelspruit)', province:'Mpumalanga',
+    lat:-25.4745, lng:30.9744, services:['General Practitioner','Pediatrics','HIV/AIDS Care','Pharmacy'],
+    hasElectricity:true, hasSolar:false, operatingHours:'07:00 - 16:30', capacityPerDay:90, baseWaitTimeMinutes:40 },
+  { id:'mp-2', name:'eMalahleni (Witbank) District Clinic', address:'Mandela St, eMalahleni', province:'Mpumalanga',
+    lat:-25.8730, lng:29.2320, services:['General Practitioner','Pharmacy','Vaccinations'],
+    hasElectricity:false, hasSolar:true, operatingHours:'08:00 - 16:00', capacityPerDay:60, baseWaitTimeMinutes:20 },
+
+  // ── NORTH WEST ───────────────────────────────────────────────────────────
+  { id:'nw-1', name:'Job Shimankana Tabane Hospital Clinic', address:'Fatima Bhayat St, Rustenburg', province:'North West',
+    lat:-25.6702, lng:27.2420, services:['General Practitioner','HIV/AIDS Care','Pharmacy','Pediatrics'],
+    hasElectricity:true, hasSolar:false, operatingHours:'07:00 - 17:00', capacityPerDay:80, baseWaitTimeMinutes:35 },
+  { id:'nw-2', name:'Mahikeng Provincial Hospital Clinic', address:'Joseph Ayinde St, Mahikeng', province:'North West',
+    lat:-25.8482, lng:25.6459, services:['General Practitioner','Dentistry','Pharmacy'],
+    hasElectricity:true, hasSolar:false, operatingHours:'08:00 - 16:00', capacityPerDay:70, baseWaitTimeMinutes:30 },
+
+  // ── FREE STATE ───────────────────────────────────────────────────────────
+  { id:'fs-1', name:'Pelonomi Regional Hospital Clinic', address:'Ngwaketse Rd, Bloemfontein', province:'Free State',
+    lat:-29.1210, lng:26.2217, services:['General Practitioner','HIV/AIDS Care','Pediatrics','Pharmacy'],
+    hasElectricity:true, hasSolar:false, operatingHours:'07:00 - 16:00', capacityPerDay:95, baseWaitTimeMinutes:50 },
+  { id:'fs-2', name:'Dihlabeng Regional Hospital Clinic', address:'Muller St, Bethlehem, Free State', province:'Free State',
+    lat:-28.2315, lng:28.2965, services:['General Practitioner','Vaccinations','Dentistry'],
+    hasElectricity:true, hasSolar:true, operatingHours:'07:30 - 15:30', capacityPerDay:50, baseWaitTimeMinutes:20 },
+
+  // ── NORTHERN CAPE ────────────────────────────────────────────────────────
+  { id:'nc-1', name:'Robert Mangaliso Sobukwe Hospital Clinic', address:'Du Toitspan Rd, Kimberley', province:'Northern Cape',
+    lat:-28.7282, lng:24.7514, services:['General Practitioner','HIV/AIDS Care','Pharmacy','Pediatrics'],
+    hasElectricity:true, hasSolar:false, operatingHours:'07:00 - 16:00', capacityPerDay:75, baseWaitTimeMinutes:30 },
+  { id:'nc-2', name:'Gordonia Hospital Clinic', address:'Mutual St, Upington', province:'Northern Cape',
+    lat:-28.4443, lng:21.2560, services:['General Practitioner','Vaccinations','Pharmacy'],
+    hasElectricity:true, hasSolar:true, operatingHours:'08:00 - 16:00', capacityPerDay:45, baseWaitTimeMinutes:15 },
+  { id:'nc-3', name:'Springbok Community Health Centre', address:'Van Riebeeck St, Springbok', province:'Northern Cape',
+    lat:-29.6647, lng:17.8865, services:['General Practitioner','HIV/AIDS Care','Vaccinations'],
+    hasElectricity:false, hasSolar:true, operatingHours:'08:00 - 15:00', capacityPerDay:35, baseWaitTimeMinutes:10 },
 ];
 
+// ─── TAB NAVIGATION ──────────────────────────────────────────────────────────
+
+function showTab(name) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('tab-active'));
+  const panel = document.getElementById('tab-' + name);
+  if (panel) panel.classList.add('tab-active');
+
+  // Desktop nav active states
+  ['clinics', 'profile', 'settings'].forEach(t => {
+    const el = document.getElementById('nav-' + t);
+    if (el) el.classList.toggle('nav-link--active', t === name);
+  });
+
+  // Mobile tab bar active states
+  ['clinics', 'profile', 'settings'].forEach(t => {
+    const el = document.getElementById('mob-tab-' + t);
+    if (el) el.classList.toggle('mob-tab-active', t === name);
+  });
+
+  // Leaflet needs a size refresh when its container is revealed from display:none
+  if (name === 'clinics' && map) {
+    setTimeout(() => map.invalidateSize(), 60);
+  }
+
+  document.getElementById('navbar-nav')?.classList.remove('nav-open');
+  localStorage.setItem('thuso_active_tab', name);
+}
+
 // Initialize UI Elements
+// ─── ESKOM LOAD SHEDDING BANNER ──────────────────────────────────────────────
+
+async function checkEskomStatus() {
+  const banner = document.getElementById('eskom-banner');
+  const bannerText = document.getElementById('eskom-status-text');
+  if (!banner || !bannerText) return;
+  try {
+    const res = await fetch('https://loadshedding.eskom.co.za/LoadShedding/GetStatus', { signal: AbortSignal.timeout(5000) });
+    const stage = parseInt(await res.text(), 10);
+    if (stage > 0) {
+      bannerText.textContent = `⚡ Eskom Stage ${stage} load shedding is active. Clinics may have limited power. Filter to solar-powered clinics below.`;
+      banner.classList.remove('hidden');
+      if (stage >= 4) banner.classList.add('eskom-high');
+    }
+  } catch (_) { /* CORS or timeout — silently skip */ }
+}
+
+// ─── PUBLIC HOLIDAY CHECK ────────────────────────────────────────────────────
+
+async function checkPublicHoliday() {
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const yr    = new Date().getFullYear();
+    const data  = await fetch(`https://date.nager.at/api/v3/PublicHolidays/${yr}/ZA`).then(r => r.json());
+    const hol   = data.find(h => h.date === today);
+    if (hol) {
+      showToast(`Today is ${hol.name} — some clinics may have reduced hours or be closed.`, 'warning');
+    }
+  } catch (_) {}
+}
+
+// ─── MYMEMORY TRANSLATION ────────────────────────────────────────────────────
+
+async function translateText(text, lang) {
+  if (!lang || lang === 'en') return text;
+  try {
+    const res  = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=en|${lang}`);
+    const data = await res.json();
+    return data?.responseData?.translatedText || text;
+  } catch (_) { return text; }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   loadLocalState();
   initSyncButton();
@@ -115,6 +729,12 @@ document.addEventListener('DOMContentLoaded', () => {
     initSearchInput();
     initModal();
     initPatientPassport();
+    // Restore last active tab (default to clinics)
+    const lastTab = localStorage.getItem('thuso_active_tab') || 'clinics';
+    showTab(lastTab);
+    // Live service checks
+    checkEskomStatus();
+    checkPublicHoliday();
   }
 
   if (isHealthcarePortal) {
@@ -217,9 +837,9 @@ function updateNetworkBadge() {
                        (state.offlineClinicSettings ? 1 : 0);
   
   if (state.isOnline) {
-    badge.className = 'badge online';
+    badge.className = 'status-chip status-chip--online';
     text.innerText = 'Online';
-    
+
     if (pendingSyncs > 0) {
       syncBtn.classList.remove('hidden');
       syncCount.innerText = pendingSyncs;
@@ -227,8 +847,8 @@ function updateNetworkBadge() {
       syncBtn.classList.add('hidden');
     }
   } else {
-    badge.className = 'badge offline';
-    text.innerText = 'Offline Mode';
+    badge.className = 'status-chip status-chip--offline';
+    text.innerText = 'Offline';
     syncBtn.classList.add('hidden');
   }
 }
@@ -248,9 +868,11 @@ function loadLocalState() {
   if (localQueue) state.offlineQueue = JSON.parse(localQueue);
   if (localQueueUpdates) state.offlineQueueUpdates = JSON.parse(localQueueUpdates);
   if (localClinics) {
-    state.clinics = JSON.parse(localClinics);
+    const parsed = JSON.parse(localClinics);
+    // Re-seed if cached data is old format without province field
+    state.clinics = (parsed.length > 0 && parsed[0].province) ? parsed : [];
   } else {
-    state.clinics = JSON.parse(JSON.stringify(MOCK_CLINICS));
+    state.clinics = [];
   }
   if (localUser) state.loggedInUser = JSON.parse(localUser);
   if (localClinic) state.loggedInClinic = JSON.parse(localClinic);
@@ -350,87 +972,82 @@ function initHealthcareAuth() {
   // Login submit
   formLogin.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const email = document.getElementById('login-email').value;
+    const email = document.getElementById('login-email').value.trim();
     const password = document.getElementById('login-password').value;
 
-    if (state.isOnline) {
-      try {
-        const response = await fetch(`${CONFIG.API_BASE}/auth/login`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password })
-        });
-        const data = await response.json();
-        
-        if (data.success) {
-          state.loggedInUser = data.user;
-          state.loggedInClinic = data.clinic;
-          saveLocalState();
-          updatePortalUI();
-          showToast(`Logged in successfully to ${data.clinic.name}`, 'success');
-        } else {
-          showToast(data.message, 'error');
-        }
-      } catch (err) {
-        showToast("Authentication server error.", 'error');
-      }
-    } else {
-      // Local check-in offline login for default seeded Sarah manager
-      if (email === 'sarah@thuso.health' && password === 'password123') {
-        state.loggedInUser = {
-          id: 'u2',
-          name: 'Dr. Sarah Dube',
-          email: 'sarah@thuso.health',
-          role: 'healthcare',
-          clinicId: 'c3'
-        };
-        state.loggedInClinic = state.clinics.find(c => c.id === 'c3');
+    const btn = formLogin.querySelector('button[type="submit"]');
+    btn.disabled = true;
+    btn.textContent = 'Signing in…';
+
+    try {
+      const response = await fetch(`${CONFIG.API_BASE}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+      const data = await response.json();
+
+      if (data.success) {
+        state.loggedInUser = data.user;
+        state.loggedInClinic = data.clinic;
+        if (data.token) setAuthToken(data.token);
         saveLocalState();
         updatePortalUI();
-        showToast("Logged in offline (Seeded profile)", "warning");
+        showToast(`Logged in successfully to ${data.clinic.name}`, 'success');
       } else {
-        showToast("Authentication requires network connection.", "error");
+        showToast(data.message || 'Invalid email or password.', 'error');
       }
+    } catch (err) {
+      // Offline demo fallback for hackathon demo
+      if (password === 'password123' && (
+        email === 'sarah@thuso.health' || email === 'admin@thuso.health' || email === 'doctor@thuso.health'
+      )) {
+        state.loggedInUser = { id: 'doctor-1', name: 'Dr. Sarah Dube', email, role: 'provider', clinic_name: 'Parktown Medical Centre' };
+        state.loggedInClinic = { id: 'clinic-1', name: 'Parktown Medical Centre', address: 'Parktown, Johannesburg' };
+        saveLocalState();
+        updatePortalUI();
+        showToast('Signed in (offline demo mode).', 'info');
+      } else {
+        showToast('Could not reach the server. Check your connection.', 'error');
+      }
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Sign In to Clinic Dashboard';
     }
   });
 
   // Register submit
   formRegister.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const name = document.getElementById('register-name').value;
-    const email = document.getElementById('register-email').value;
+    const name = document.getElementById('register-name').value.trim();
+    const email = document.getElementById('register-email').value.trim();
     const password = document.getElementById('register-password').value;
-    const clinicName = document.getElementById('register-clinic-name').value;
-    const clinicAddress = document.getElementById('register-clinic-address').value;
+    const clinicName = document.getElementById('register-clinic-name').value.trim();
+    const clinicAddress = document.getElementById('register-clinic-address').value.trim();
 
-    if (!state.isOnline) {
-      showToast("Cannot register new clinics while offline.", "error");
-      return;
-    }
+    const btn = formRegister.querySelector('button[type="submit"]');
+    btn.disabled = true;
+    btn.textContent = 'Registering…';
 
     try {
       const response = await fetch(`${CONFIG.API_BASE}/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name,
-          email,
-          password,
-          role: 'healthcare',
-          clinicName,
-          clinicAddress
-        })
+        body: JSON.stringify({ name, email, password, role: 'healthcare', clinicName, clinicAddress })
       });
       const data = await response.json();
 
       if (data.success) {
-        showToast("Registration completed! Please sign in.", "success");
+        showToast('Registration complete! Please sign in.', 'success');
         tabLogin.click();
       } else {
-        showToast(data.message, 'error');
+        showToast(data.message || 'Registration failed.', 'error');
       }
     } catch (err) {
-      showToast("Registration failed: connection error.", 'error');
+      showToast('Could not reach the server. Check your connection.', 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Register Clinic';
     }
   });
 }
@@ -442,6 +1059,7 @@ function initHealthcareDashboard() {
   logoutBtn.addEventListener('click', () => {
     state.loggedInUser = null;
     state.loggedInClinic = null;
+    setAuthToken(null);
     saveLocalState();
     updatePortalUI();
     showToast("Signed out from clinic dashboard.", "info");
@@ -485,9 +1103,8 @@ function initHealthcareDashboard() {
 
     if (state.isOnline) {
       try {
-        const response = await fetch(`${CONFIG.API_BASE}/clinics/${cId}`, {
+        const response = await authFetch(`${CONFIG.API_BASE}/clinics/${cId}`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(updatePayload)
         });
         const data = await response.json();
@@ -729,11 +1346,19 @@ async function fetchClinics() {
         return;
       }
     } catch (err) {
-      console.warn("Fetch clinics failed, falling back to local dataset");
+      console.warn("Fetch clinics failed, using cached data if available");
     }
   }
-  
-  calculateOfflineClinics();
+
+  if (state.clinics.length > 0) {
+    calculateOfflineClinics();
+  } else {
+    // Seed all-province demo data so the app always has clinics to show
+    state.clinics = DEMO_CLINICS_SA;
+    saveLocalState();
+    calculateOfflineClinics();
+    showToast('Showing all-province demo clinics (offline mode).', 'info');
+  }
 }
 
 async function fetchBookings() {
@@ -745,7 +1370,7 @@ async function fetchBookings() {
         state.bookings = data.bookings;
         
         // Update active patient booking
-        const active = state.bookings.find(b => b.userId === state.patientUser ? state.patientUser.id : 'u1' && (b.status === 'Confirmed' || b.status === 'CheckedIn'));
+        const active = state.bookings.find(b => b.userId === (state.patientUser ? state.patientUser.id : 'u1') && (b.status === 'Confirmed' || b.status === 'CheckedIn'));
         state.activeBooking = active || null;
         
         saveLocalState();
@@ -854,26 +1479,66 @@ function initSyncButton() {
 // ----------------------------------------------------
 
 function initLocationSelector() {
+  // "My Location" button — re-captures GPS and re-fetches clinics
+  const realLocBtn = document.getElementById('btn-use-real-location');
+  if (realLocBtn) {
+    realLocBtn.addEventListener('click', () => requestRealLocation(false));
+  }
+
+  // "Snap to my location" button — pans/zooms map to known position instantly
+  const snapBtn = document.getElementById('btn-snap-to-location');
+  if (snapBtn) {
+    snapBtn.addEventListener('click', () => {
+      if (!map) return;
+      const { lat, lng } = state.userLocation;
+      if (!lat || !lng) {
+        showToast('Location not yet captured. Tap "My Location" first.', 'warning');
+        return;
+      }
+      map.flyTo([lat, lng], 16, { animate: true, duration: 0.8 });
+      // Briefly scale up the user dot to draw attention
+      if (userMarker) {
+        const el = userMarker.getElement();
+        if (el) {
+          el.style.transition = 'transform 0.3s';
+          el.style.transform  = 'scale(2)';
+          setTimeout(() => { el.style.transform = 'scale(1)'; }, 500);
+        }
+      }
+    });
+  }
+
+  // Manual fallback location buttons
   const buttons = document.querySelectorAll('.btn-loc');
   buttons.forEach(btn => {
     btn.addEventListener('click', () => {
       buttons.forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
-      
+
       state.userLocation.lat = parseFloat(btn.dataset.lat);
       state.userLocation.lng = parseFloat(btn.dataset.lng);
       state.userLocation.name = btn.dataset.name;
-      
-      showToast(`Simulating location: ${state.userLocation.name}`, 'info');
-      fetchClinics().then(() => renderClinicsList());
+
+      const label = document.getElementById('location-area-name');
+      if (label) label.innerHTML = `<i class="fa-solid fa-map-pin"></i> ${state.userLocation.name}`;
+
+      placeUserMarker(state.userLocation.lat, state.userLocation.lng);
+      if (map) map.setView([state.userLocation.lat, state.userLocation.lng], 14);
+
+      showToast(`Location set to ${state.userLocation.name}`, 'info');
+      fetchClinics().then(() => {
+        renderClinicsList();
+        updateMapClinicMarkers();
+      });
+      fetchOSMClinics(state.userLocation.lat, state.userLocation.lng, 15000).then(updateOSMMarkers);
     });
   });
 }
 
 function initSortingControls() {
-  const sortTotal = document.getElementById('sort-total');
+  const sortTotal    = document.getElementById('sort-total');
   const sortDistance = document.getElementById('sort-distance');
-  const sortWait = document.getElementById('sort-wait');
+  const sortWait     = document.getElementById('sort-wait');
   
   if (!sortTotal) return;
 
@@ -903,6 +1568,17 @@ function initSortingControls() {
     state.sortBy = 'waitTime';
     sortAndRenderClinics();
   });
+
+  // ── Power filter buttons ──────────────────────────────────────────────────
+  const pwrBtns = document.querySelectorAll('.btn-power-filter');
+  pwrBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      pwrBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      state.powerFilter = btn.dataset.power;
+      sortAndRenderClinics();
+    });
+  });
 }
 
 function initSearchInput() {
@@ -924,11 +1600,20 @@ function sortAndRenderClinics() {
   const listContainer = document.getElementById('clinics-list');
   if (!listContainer) return;
   
-  // Filter
+  // Text search filter
   let filtered = state.clinics.filter(c => {
-    return c.name.toLowerCase().includes(query) || 
+    return c.name.toLowerCase().includes(query) ||
            c.services.some(s => s.toLowerCase().includes(query));
   });
+
+  // Power status filter
+  if (state.powerFilter === 'grid') {
+    filtered = filtered.filter(c => c.hasElectricity);
+  } else if (state.powerFilter === 'solar') {
+    filtered = filtered.filter(c => !c.hasElectricity && c.hasSolar);
+  } else if (state.powerFilter === 'outage') {
+    filtered = filtered.filter(c => !c.hasElectricity && !c.hasSolar);
+  }
 
   // Sort
   if (state.sortBy === 'totalTime') {
@@ -953,9 +1638,12 @@ function sortAndRenderClinics() {
     return;
   }
 
+  // Sync map markers whenever list updates
+  updateMapClinicMarkers();
+
   listContainer.innerHTML = filtered.map(c => {
-    const totalTimeText = c.totalTimeMinutes >= 60 
-      ? `${Math.floor(c.totalTimeMinutes / 60)}h ${c.totalTimeMinutes % 60}m` 
+    const totalTimeText = c.totalTimeMinutes >= 60
+      ? `${Math.floor(c.totalTimeMinutes / 60)}h ${c.totalTimeMinutes % 60}m`
       : `${c.totalTimeMinutes} mins`;
 
     // Power status badges
@@ -978,7 +1666,10 @@ function sortAndRenderClinics() {
     return `
       <div class="card clinic-card" onclick="openBookingModal('${c.id}')">
         <div class="clinic-card-header">
-          <h3>${c.name}</h3>
+          <div>
+            <h3>${c.name}</h3>
+            ${c.province ? `<span class="clinic-province-tag"><i class="fa-solid fa-map-pin"></i> ${c.province}</span>` : ''}
+          </div>
           <span class="distance-tag">
             ${c.distanceKm} km
           </span>
@@ -1018,8 +1709,8 @@ function updateActiveBookingUI() {
   if (!panel) return;
   
   // Find current user's active booking
-  const booking = state.bookings.find(b => 
-    b.userId === state.patientUser ? state.patientUser.id : 'u1' && 
+  const booking = state.bookings.find(b =>
+    b.userId === (state.patientUser ? state.patientUser.id : 'u1') &&
     (b.status === 'Confirmed' || b.status === 'CheckedIn')
   );
 
@@ -1084,7 +1775,7 @@ function updateHistoryUI() {
   if (!container) return;
   
   // Filter for patients bookings
-  const patientBookings = state.bookings.filter(b => b.userId === state.patientUser ? state.patientUser.id : 'u1');
+  const patientBookings = state.bookings.filter(b => b.userId === (state.patientUser ? state.patientUser.id : 'u1'));
 
   if (patientBookings.length === 0) {
     container.innerHTML = `
@@ -1167,6 +1858,14 @@ function openBookingModal(clinicId) {
   select.onchange = updateAdvice;
   updateAdvice();
 
+  // Auto-fill from logged-in patient
+  if (state.patientUser) {
+    const nameField = document.getElementById('patient-name');
+    const phoneField = document.getElementById('patient-phone');
+    if (nameField && !nameField.value) nameField.value = state.patientUser.name || '';
+    if (phoneField && !phoneField.value) phoneField.value = state.patientUser.phone || '';
+  }
+
   document.getElementById('booking-modal').style.display = 'flex';
 }
 
@@ -1194,7 +1893,7 @@ function initModal() {
     modal.style.display = 'none';
     
     // Check if patient already has active ticket
-    const active = state.bookings.find(b => b.userId === state.patientUser ? state.patientUser.id : 'u1' && (b.status === 'Confirmed' || b.status === 'CheckedIn'));
+    const active = state.bookings.find(b => b.userId === (state.patientUser ? state.patientUser.id : 'u1') && (b.status === 'Confirmed' || b.status === 'CheckedIn'));
     if (active) {
       showToast("You already have an active ticket. Please cancel or complete it first.", "warning");
       return;
@@ -1210,13 +1909,14 @@ async function createPatientBooking(clinicId, appointmentTime) {
 
   if (state.isOnline) {
     try {
-      const response = await fetch(`${CONFIG.API_BASE}/bookings`, {
+      const response = await authFetch(`${CONFIG.API_BASE}/bookings`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId: state.patientUser ? state.patientUser.id : 'u1',
           clinicId,
-          appointmentTime
+          appointmentTime,
+          patientName: document.getElementById('patient-name')?.value || (state.patientUser ? state.patientUser.name : 'Patient'),
+          patientPhone: document.getElementById('patient-phone')?.value || null
         })
       });
       const data = await response.json();
@@ -1361,26 +2061,52 @@ function formatTime(isoString) {
 // ----------------------------------------------------
 
 function switchPatientTab(tab) {
-  const loginForm = document.getElementById('pt-login-form');
+  const loginForm    = document.getElementById('pt-login-form');
   const registerForm = document.getElementById('pt-register-form');
-  const loginBtn = document.getElementById('pt-tab-login');
-  const registerBtn = document.getElementById('pt-tab-register');
+  const loginBtn     = document.getElementById('pt-tab-login');
+  const registerBtn  = document.getElementById('pt-tab-register');
+  const banner       = document.getElementById('auth-error-banner');
   if (!loginForm) return;
+  // Clear any previous error
+  if (banner) banner.classList.add('hidden');
   if (tab === 'login') {
     loginForm.classList.remove('hidden');
     registerForm.classList.add('hidden');
-    loginBtn.className = 'btn btn-primary';
-    registerBtn.className = 'btn btn-sort';
+    loginBtn.classList.add('auth-tab-active');
+    registerBtn.classList.remove('auth-tab-active');
   } else {
     loginForm.classList.add('hidden');
     registerForm.classList.remove('hidden');
-    registerBtn.className = 'btn btn-primary';
-    loginBtn.className = 'btn btn-sort';
+    registerBtn.classList.add('auth-tab-active');
+    loginBtn.classList.remove('auth-tab-active');
   }
 }
 
-function onPatientLoggedIn(user) {
+function togglePwVisibility(inputId, btn) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  const isHidden = input.type === 'password';
+  input.type = isHidden ? 'text' : 'password';
+  btn.innerHTML = isHidden
+    ? '<i class="fa-regular fa-eye-slash"></i>'
+    : '<i class="fa-regular fa-eye"></i>';
+}
+
+function showAuthError(msg) {
+  const banner  = document.getElementById('auth-error-banner');
+  const msgEl   = document.getElementById('auth-error-msg');
+  if (!banner) return;
+  if (msgEl) msgEl.textContent = msg;
+  banner.classList.remove('hidden');
+}
+function clearAuthError() {
+  const banner = document.getElementById('auth-error-banner');
+  if (banner) banner.classList.add('hidden');
+}
+
+function onPatientLoggedIn(user, token) {
   state.patientUser = user;
+  if (token) setAuthToken(token);
   saveLocalState();
 
   // Close the auth modal
@@ -1394,7 +2120,11 @@ function onPatientLoggedIn(user) {
   if (greeting) { greeting.style.display = 'inline-flex'; greetingName.innerText = user.name; }
   if (logoutBtn) logoutBtn.style.display = 'inline-flex';
 
-  // Now load everything
+  // Initialise map then auto-request real location
+  initMap();
+  autoRequestLocation();
+
+  // Load clinic data (map markers updated inside renderClinicsList)
   checkConnection().then(() => {
     fetchClinics().then(() => renderClinicsList());
     fetchBookings().then(() => {
@@ -1417,6 +2147,9 @@ function initPatientAuth() {
     const logoutBtn = document.getElementById('btn-patient-logout');
     if (greeting) { greeting.style.display = 'inline-flex'; greetingName.innerText = state.patientUser.name; }
     if (logoutBtn) logoutBtn.style.display = 'inline-flex';
+    // Initialise map (DOM is ready here because DOMContentLoaded has fired)
+    initMap();
+    autoRequestLocation();
     return;
   }
 
@@ -1425,49 +2158,42 @@ function initPatientAuth() {
   if (loginForm) {
     loginForm.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const email = document.getElementById('pt-login-email').value.trim();
+      clearAuthError();
+      const email    = document.getElementById('pt-login-email').value.trim();
       const password = document.getElementById('pt-login-password').value;
 
-      if (state.isOnline) {
-        try {
-          const res = await fetch(`${CONFIG.API_BASE}/auth/login`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password })
-          });
-          const data = await res.json();
-          if (data.success && data.user.role === 'patient') {
-            onPatientLoggedIn(data.user);
-            showToast(`Welcome back, ${data.user.name}!`, 'success');
-          } else if (data.success && data.user.role !== 'patient') {
-            showToast('Healthcare providers must use the Providers Portal.', 'warning');
-          } else {
-            showToast(data.message || 'Invalid credentials.', 'error');
-          }
-        } catch (err) {
-          // Offline fallback — allow seeded patient
-          if (email === 'paseka@thuso.health' && password === 'password123') {
-            onPatientLoggedIn({
-              id: 'u1', name: 'Paseka Moloi', email: 'paseka@thuso.health',
-              role: 'patient', thuso_id_hash: 'TH-U1', consentPin: '1234',
-              isAccessGranted: true, language: 'en'
-            });
-            showToast('Signed in offline (demo patient).', 'warning');
-          } else {
-            showToast('Cannot authenticate while offline.', 'error');
-          }
+      const btn = document.getElementById('btn-pt-login');
+      if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Signing in…'; }
+
+      try {
+        const res  = await fetch(`${CONFIG.API_BASE}/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+        const data = await res.json();
+        if (data.success && data.user.role === 'patient') {
+          onPatientLoggedIn(data.user, data.token);
+          showToast(`👋 Welcome back, ${data.user.name}!`, 'success');
+        } else if (data.success && data.user.role !== 'patient') {
+          showAuthError('Healthcare providers must use the Providers Portal.');
+        } else {
+          showAuthError(data.message || 'Incorrect email or password. Please try again.');
         }
-      } else {
+      } catch {
+        // Offline demo fallback
         if (email === 'paseka@thuso.health' && password === 'password123') {
           onPatientLoggedIn({
             id: 'u1', name: 'Paseka Moloi', email: 'paseka@thuso.health',
             role: 'patient', thuso_id_hash: 'TH-U1', consentPin: '1234',
             isAccessGranted: true, language: 'en'
-          });
-          showToast('Signed in offline (demo patient).', 'warning');
+          }, null);
+          showToast('Signed in offline (demo mode).', 'warning');
         } else {
-          showToast('Cannot authenticate while offline.', 'error');
+          showAuthError('Could not reach the server. Check your connection or use the demo account.');
         }
+      } finally {
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-right-to-bracket"></i> Sign In'; }
       }
     });
   }
@@ -1477,31 +2203,34 @@ function initPatientAuth() {
   if (registerForm) {
     registerForm.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const name = document.getElementById('pt-reg-name').value.trim();
-      const email = document.getElementById('pt-reg-email').value.trim();
-      const phone = document.getElementById('pt-reg-phone').value.trim();
+      clearAuthError();
+      const name     = document.getElementById('pt-reg-name').value.trim();
+      const email    = document.getElementById('pt-reg-email').value.trim();
+      const phone    = document.getElementById('pt-reg-phone').value.trim();
       const password = document.getElementById('pt-reg-password').value;
 
-      if (!state.isOnline) {
-        showToast('Registration requires an internet connection.', 'error');
-        return;
-      }
+      if (password.length < 6) { showAuthError('Password must be at least 6 characters.'); return; }
+
+      const btn = document.getElementById('btn-pt-register');
+      if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Creating account…'; }
 
       try {
-        const res = await fetch(`${CONFIG.API_BASE}/auth/register`, {
+        const res  = await fetch(`${CONFIG.API_BASE}/auth/register`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name, email, phone, password, role: 'patient' })
         });
         const data = await res.json();
         if (data.success) {
-          onPatientLoggedIn(data.user);
-          showToast(`Account created! Welcome, ${data.user.name}. Your ThusoID is ${data.user.thuso_id_hash}`, 'success');
+          onPatientLoggedIn(data.user, data.token);
+          showToast(`🎉 Welcome, ${data.user.name}! ThusoID: ${data.user.thuso_id_hash}`, 'success');
         } else {
-          showToast(data.message || 'Registration failed.', 'error');
+          showAuthError(data.message || 'Registration failed. Please try again.');
         }
-      } catch (err) {
-        showToast('Registration error. Please try again.', 'error');
+      } catch {
+        showAuthError('Could not reach the server. Check your connection.');
+      } finally {
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-user-plus"></i> Create My Health Account'; }
       }
     });
   }
@@ -1510,13 +2239,29 @@ function initPatientAuth() {
   const logoutBtn = document.getElementById('btn-patient-logout');
   if (logoutBtn) {
     logoutBtn.addEventListener('click', () => {
-      state.patientUser = null;
-      state.bookings = [];
+      // Clear all patient session data
+      state.patientUser   = null;
+      state.bookings      = [];
       state.activeBooking = null;
+      setAuthToken(null);
       saveLocalState();
       localStorage.removeItem('thuso_patient_records');
-      // Reload the page to show the login modal again
-      window.location.reload();
+
+      // Reset navbar user section
+      const greeting = document.getElementById('patient-greeting');
+      const greetingName = document.getElementById('patient-greeting-name');
+      if (greeting) { greeting.style.display = 'none'; }
+      if (greetingName) greetingName.textContent = '';
+      logoutBtn.style.display = 'none';
+
+      // Show the auth modal again
+      const modal = document.getElementById('patient-auth-modal');
+      if (modal) {
+        modal.style.display = 'flex';
+        switchPatientTab('login');
+      }
+
+      showToast('You have been signed out.', 'info');
     });
   }
 }
@@ -1550,6 +2295,9 @@ function initPatientPassport() {
       if (cached) {
         renderPatientTimeline(JSON.parse(cached));
       }
+      // Translate confirmation message via MyMemory API
+      const msg = await translateText('Language preference saved.', currentLanguage);
+      showToast(msg, 'success');
     });
   }
 
@@ -1588,10 +2336,71 @@ function initPatientPassport() {
   }
 }
 
+function seedDemoRecordsIfNeeded() {
+  const existing = localStorage.getItem('thuso_patient_records');
+  if (existing) {
+    try {
+      const parsed = JSON.parse(existing);
+      if (parsed.length > 0 && parsed[0].visit_type) return; // already seeded with new format
+    } catch (_) {}
+  }
+  const now = Date.now();
+  const D = 86400000;
+  const at = (daysAgo, hour, min) => {
+    const d = new Date(now - daysAgo * D);
+    d.setHours(hour, min, 0, 0);
+    return d.toISOString();
+  };
+  localStorage.setItem('thuso_patient_records', JSON.stringify([
+    {
+      id: 'demo-4',
+      doctor_name: 'Dr. Sarah Dube',
+      clinic_name: 'Parktown Medical Centre',
+      visit_type: 'GP Consultation',
+      diagnosis: 'Upper Respiratory Tract Infection (URTI)',
+      treatment_plan: 'Warm salt-water gargle twice daily, rest, avoid cold drinks',
+      medication_prescribed: 'Amoxicillin 250mg, cough syrup, Strepsils',
+      created_at: at(180, 9, 15)
+    },
+    {
+      id: 'demo-3',
+      doctor_name: 'Dr. Nomsa Zulu',
+      clinic_name: 'Alexandra Health Centre',
+      visit_type: 'Emergency',
+      diagnosis: 'Fracture: Left Fibula (Broken Leg)',
+      treatment_plan: 'Plaster cast 6 weeks, crutches, no weight-bearing. Follow-up X-ray in 3 weeks.',
+      medication_prescribed: 'Tramadol 50mg, Calcium + Vitamin D supplement',
+      created_at: at(90, 14, 30)
+    },
+    {
+      id: 'demo-2',
+      doctor_name: 'Dr. James Khumalo',
+      clinic_name: 'Soweto Community Clinic',
+      visit_type: 'GP Consultation',
+      diagnosis: 'Tension Headache',
+      treatment_plan: 'Rest in dark quiet room, reduce screen time, stress management techniques',
+      medication_prescribed: 'Ibuprofen 400mg, caffeine tablet',
+      created_at: at(45, 11, 0)
+    },
+    {
+      id: 'demo-1',
+      doctor_name: 'Dr. Sarah Dube',
+      clinic_name: 'Parktown Medical Centre',
+      visit_type: 'Follow-up',
+      diagnosis: 'Influenza (Common Flu)',
+      treatment_plan: 'Bed rest 3 days, drink plenty of fluids, steam inhalation twice daily',
+      medication_prescribed: 'Paracetamol 500mg, Vitamin C 1000mg, nasal spray',
+      created_at: at(14, 8, 45)
+    }
+  ]));
+}
+
 async function fetchPatientPassport() {
   if (!state.patientUser) return;
   const patientId = state.patientUser.id;
-  
+
+  seedDemoRecordsIfNeeded();
+
   // Pre-populate from session (instant, no API call needed for basics)
   document.getElementById('passport-patient-name').innerText = state.patientUser.name;
   document.getElementById('passport-thuso-id').innerText = state.patientUser.thuso_id_hash || `TH-${patientId.toUpperCase()}`;
@@ -1599,7 +2408,7 @@ async function fetchPatientPassport() {
   // 1. Fetch/Sync Consent Settings from server
   if (state.isOnline) {
     try {
-      const consentRes = await fetch(`${CONFIG.API_BASE}/patients/${patientId}/consent`);
+      const consentRes = await authFetch(`${CONFIG.API_BASE}/patients/${patientId}/consent`);
       const consentData = await consentRes.json();
       if (consentData.success) {
         updateConsentUI(consentData.consent);
@@ -1626,7 +2435,7 @@ async function fetchPatientPassport() {
   let records = [];
   if (state.isOnline) {
     try {
-      const recordsRes = await fetch(`${CONFIG.API_BASE}/patients/${patientId}/records`);
+      const recordsRes = await authFetch(`${CONFIG.API_BASE}/patients/${patientId}/records`);
       const recordsData = await recordsRes.json();
       if (recordsData.success) {
         records = recordsData.records;
@@ -1694,9 +2503,8 @@ async function updatePatientConsentSettings(payload) {
   const patientId = state.patientUser ? state.patientUser.id : 'u1';
   if (state.isOnline) {
     try {
-      const response = await fetch(`${CONFIG.API_BASE}/patients/${patientId}/consent`, {
+      const response = await authFetch(`${CONFIG.API_BASE}/patients/${patientId}/consent`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
       const data = await response.json();
@@ -1730,15 +2538,17 @@ async function renderPatientTimeline(records) {
   }
 
   container.innerHTML = '';
-  
+
   // Sort records descending
   const sorted = [...records].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
-  for (const rec of sorted) {
-    const daysAgo = Math.round((Date.now() - new Date(rec.created_at)) / 86400000);
-    const timeText = daysAgo === 0 ? 'Today' : daysAgo === 1 ? 'Yesterday' : `${daysAgo} days ago`;
-    
-    // Translate text dynamically using Cloudflare Mock translator
+  for (let i = 0; i < sorted.length; i++) {
+    const rec = sorted[i];
+    const visitDate = new Date(rec.created_at);
+    const dateStr = visitDate.toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' });
+    const timeStr = visitDate.toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' });
+    const visitType = rec.visit_type || 'GP Consultation';
+
     const diagnosis = await translateMockText(rec.diagnosis, currentLanguage);
     const plan = await translateMockText(rec.treatment_plan, currentLanguage);
     const meds = await translateMockText(rec.medication_prescribed, currentLanguage);
@@ -1747,16 +2557,27 @@ async function renderPatientTimeline(records) {
     item.className = 'timeline-item';
     item.innerHTML = `
       <div class="timeline-header">
-        <span class="timeline-doctor">${rec.doctor_name} (${rec.clinic_name})</span>
-        <span>${timeText}</span>
+        <div class="timeline-header-left">
+          <span class="timeline-visit-num">${sorted.length - i}</span>
+          <div>
+            <div class="timeline-doctor"><i class="fa-solid fa-user-doctor" style="font-size:0.7rem;color:var(--color-primary);margin-right:3px;"></i>${rec.doctor_name}</div>
+            <div class="timeline-clinic">${rec.clinic_name}</div>
+          </div>
+        </div>
+        <div style="text-align:right;flex-shrink:0;">
+          <div class="timeline-date-badge"><i class="fa-regular fa-calendar"></i> ${dateStr}</div>
+          <div style="font-size:0.6rem;color:var(--text-muted);margin-top:2px;text-align:right;">
+            <i class="fa-regular fa-clock"></i> ${timeStr} &nbsp;·&nbsp; ${visitType}
+          </div>
+        </div>
       </div>
       <div class="timeline-body">
         <p><strong>Diagnosis:</strong> ${diagnosis}</p>
-        ${plan ? `<p><strong>Plan:</strong> ${plan}</p>` : ''}
-        ${meds ? `<p><strong>Prescription:</strong> ${meds}</p>` : ''}
+        ${plan ? `<p><strong>Treatment:</strong> ${plan}</p>` : ''}
+        ${meds ? `<p><strong>Prescribed:</strong> ${meds}</p>` : ''}
         ${rec.file_url_r2 ? `
           <a href="${rec.file_url_r2}" target="_blank" class="timeline-attachment">
-            <i class="fa-solid fa-file-pdf"></i> View Attachment (Cloudflare R2)
+            <i class="fa-solid fa-file-pdf"></i> View Attachment
           </a>
         ` : ''}
       </div>
@@ -1784,24 +2605,77 @@ async function translateMockText(text, targetLang) {
     }
   }
 
-  // Offline fallback translation
+  // Offline fallback — full dictionary covering all demo visit records
   const dict = {
-    'zulu': {
-      'Mild respiratory infection': 'Ukwetheleleka okuncane kokuphefumula',
-      'Bed rest and hydration': 'Ukuphumula embhedeni nokuphuza amanzi amaningi',
-      'Paracetamol 500mg, Vitamin C': 'I-Paracetamol 500mg, i-Vitamin C'
+    zulu: {
+      // Diagnoses
+      'Upper Respiratory Tract Infection (URTI)': 'Ukwetholwa Kwezifo Zomoya Ongaphezulu (URTI)',
+      'Fracture: Left Fibula (Broken Leg)': 'Ukugqabhuka: I-Fibula Esokunxele (Umlenze Ophukile)',
+      'Tension Headache': 'Ikhanda Elibuhlungu Ngenxa Yethani',
+      'Influenza (Common Flu)': 'Umkhuhlane Wamafufunyo (Umkhuhlane Ojwayelekile)',
+      // Treatments
+      'Warm salt-water gargle twice daily, rest, avoid cold drinks': 'Xwaya amanzi ashisayo anelayisi kabili ngosuku, phumula, gwema iziphuzo ezibandayo',
+      'Plaster cast 6 weeks, crutches, no weight-bearing. Follow-up X-ray in 3 weeks.': 'Iplasta evikela amathambo ezinsukwini ezingu-6, izinti zokuhamba, ungasekeli. Ama-X-ray okulandelela emavikini amathathu.',
+      'Rest in dark quiet room, reduce screen time, stress management techniques': 'Phumula egumbini elimnyama elingenangxolo, nciphisa isikhathi seskrini, izindlela zokuphatha ingcindezi',
+      'Bed rest 3 days, drink plenty of fluids, steam inhalation twice daily': 'Lala embhedeni izinsuku ezintathu, phuza amanzi amaningi, hitha intwesi kabili ngosuku',
+      // Prescriptions
+      'Amoxicillin 250mg, cough syrup, Strepsils': 'I-Amoxicillin 250mg, isiropho sokhwehlela, i-Strepsils',
+      'Tramadol 50mg, Calcium + Vitamin D supplement': 'I-Tramadol 50mg, iCalcium + iVitamin D',
+      'Ibuprofen 400mg, caffeine tablet': 'I-Ibuprofen 400mg, ipilisi ye-caffeine',
+      'Paracetamol 500mg, Vitamin C 1000mg, nasal spray': 'I-Paracetamol 500mg, iVitamin C 1000mg, isifinqo somphimbo',
     },
-    'sesotho': {
-      'Mild respiratory infection': 'Tšoaetso e bonolo ea ho hema',
-      'Bed rest and hydration': 'Ho phomola betheng le ho nwa metsi a mangata',
-      'Paracetamol 500mg, Vitamin C': 'Paracetamol 500mg, Vitamin C'
-    }
+    sesotho: {
+      'Upper Respiratory Tract Infection (URTI)': 'Tšoaetso ea Tsela ea Ho Hema e ka Holimo (URTI)',
+      'Fracture: Left Fibula (Broken Leg)': 'Kephaho: Fibula e ka Molemeng (Leoto le Robehileng)',
+      'Tension Headache': 'Hlooho e Utloang Bohloko ka Kgathello',
+      'Influenza (Common Flu)': 'Mokotla o tloaelehileng (Mokotla)',
+      'Warm salt-water gargle twice daily, rest, avoid cold drinks': 'Gargle ka metsi a chesang a letswai habeli ka letsatsi, phomola, hema linotsi tse batso',
+      'Plaster cast 6 weeks, crutches, no weight-bearing. Follow-up X-ray in 3 weeks.': 'Kase ea samente libeke tse 6, litokotoko, se kenye boima. Tšebeliso ea X-ray hamorao libeke tse tharo.',
+      'Rest in dark quiet room, reduce screen time, stress management techniques': 'Phomola kamoreng e lefifi le kgutsitseng, theola nako ea skrini, mekhoa ea ho laola kgatello',
+      'Bed rest 3 days, drink plenty of fluids, steam inhalation twice daily': 'Phomola setulong matsatsi a mararo, noa metsi a mangata, hema mosi habeli ka letsatsi',
+      'Amoxicillin 250mg, cough syrup, Strepsils': 'Amoxicillin 250mg, seropho sa ho sweefa, Strepsils',
+      'Tramadol 50mg, Calcium + Vitamin D supplement': 'Tramadol 50mg, Calcium + Vitamin D',
+      'Ibuprofen 400mg, caffeine tablet': 'Ibuprofen 400mg, khatase ea caffeine',
+      'Paracetamol 500mg, Vitamin C 1000mg, nasal spray': 'Paracetamol 500mg, Vitamin C 1000mg, sepalesa sa nko',
+    },
+    xhosa: {
+      'Upper Respiratory Tract Infection (URTI)': 'Ukusuleleka Kwendlela Yokuphefumla Engaphezulu (URTI)',
+      'Fracture: Left Fibula (Broken Leg)': 'Ukwaphuka: I-Fibula Ekhohlo (Umlenze Ophukileyo)',
+      'Tension Headache': 'Ntloko Ebuhlungu Ngenxa Yoqhwithelo',
+      'Influenza (Common Flu)': 'Umkhuhlane Wafele (Umkhuhlane Oqhelekileyo)',
+      'Warm salt-water gargle twice daily, rest, avoid cold drinks': 'Gargle ngamanzi ashushu anetyuwa kabini ngemini, phumla, gqithisa iziselo ezibandayo',
+      'Plaster cast 6 weeks, crutches, no weight-bearing. Follow-up X-ray in 3 weeks.': 'Iplasta evikela amathambo iiveki ezi-6, iintsimbi zokukhathaza, unganyamekeli. I-X-ray yokulandelela kwezi-3 iiveki.',
+      'Rest in dark quiet room, reduce screen time, stress management techniques': 'Phumla egumbini elimnyama elingenantloko, nciphisa ixesha leskrini, iindlela zokuphatha ingxaki',
+      'Bed rest 3 days, drink plenty of fluids, steam inhalation twice daily': 'Lala embhedeni iintsuku ezi-3, sela amanzi amaningi, phefumla umsi kabini ngemini',
+      'Amoxicillin 250mg, cough syrup, Strepsils': 'I-Amoxicillin 250mg, isiropo ukukhwehlela, i-Strepsils',
+      'Tramadol 50mg, Calcium + Vitamin D supplement': 'I-Tramadol 50mg, iCalcium + iVitamin D',
+      'Ibuprofen 400mg, caffeine tablet': 'I-Ibuprofen 400mg, ipilisi ye-caffeine',
+      'Paracetamol 500mg, Vitamin C 1000mg, nasal spray': 'I-Paracetamol 500mg, iVitamin C 1000mg, isprey yempumlo',
+    },
+    afrikaans: {
+      'Upper Respiratory Tract Infection (URTI)': 'Bo-Asemhalingstelselinfeksie (URTI)',
+      'Fracture: Left Fibula (Broken Leg)': 'Fraktuur: Linker Fibula (Gebreekte Been)',
+      'Tension Headache': 'Spanninghoofpyn',
+      'Influenza (Common Flu)': 'Griep (Gewone Griep)',
+      'Warm salt-water gargle twice daily, rest, avoid cold drinks': 'Warm soutwater gorgel twee keer per dag, rus, vermy koue drankies',
+      'Plaster cast 6 weeks, crutches, no weight-bearing. Follow-up X-ray in 3 weeks.': 'Gipsverband 6 weke, krukke, geen gewig dra. Opvolgings-X-straal in 3 weke.',
+      'Rest in dark quiet room, reduce screen time, stress management techniques': 'Rus in \'n donker stil kamer, verminder skermtyd, stresbestuurstegnieke',
+      'Bed rest 3 days, drink plenty of fluids, steam inhalation twice daily': 'Bedrus 3 dae, drink baie vloeistowwe, stoom inaseming twee keer per dag',
+      'Amoxicillin 250mg, cough syrup, Strepsils': 'Amoxicillin 250mg, hoessiroop, Strepsils',
+      'Tramadol 50mg, Calcium + Vitamin D supplement': 'Tramadol 50mg, Kalsium + Vitamien D aanvulling',
+      'Ibuprofen 400mg, caffeine tablet': 'Ibuprofen 400mg, koffeïentablet',
+      'Paracetamol 500mg, Vitamin C 1000mg, nasal spray': 'Parasetamol 500mg, Vitamien C 1000mg, neussproei',
+    },
   };
   const langKey = targetLang.toLowerCase();
-  if (dict[langKey] && dict[langKey][text]) {
-    return dict[langKey][text];
+  if (dict[langKey] && dict[langKey][text]) return dict[langKey][text];
+  // Partial match fallback
+  if (dict[langKey]) {
+    for (const [en, translated] of Object.entries(dict[langKey])) {
+      if (text.includes(en) || en.includes(text)) return translated;
+    }
   }
-  return `[${targetLang.toUpperCase()}] ${text}`;
+  return text;
 }
 
 async function fetchAndRenderAuditLogs() {
@@ -1813,7 +2687,7 @@ async function fetchAndRenderAuditLogs() {
 
   if (state.isOnline) {
     try {
-      const response = await fetch(`${CONFIG.API_BASE}/patients/${patientId}/logs`);
+      const response = await authFetch(`${CONFIG.API_BASE}/patients/${patientId}/logs`);
       const data = await response.json();
       if (data.success) {
         logs = data.logs;
@@ -1996,9 +2870,23 @@ function initPractitionerPassport() {
       // Email or ID lookup
       let patientId = patientInput.includes('@') ? null : patientInput;
 
+      // Offline fallback — show cached records for demo user
       if (!state.isOnline) {
-        errorContainer.innerText = 'Patient lookup requires an online connection.';
-        errorContainer.classList.remove('hidden');
+        const isDemo = patientInput === 'u1' || patientInput === 'TH-U1' ||
+          patientInput.toLowerCase() === 'paseka@thuso.health';
+        if (isDemo) {
+          currentLookupPatientId = 'u1';
+          document.getElementById('practitioner-patient-name').innerText = 'Paseka Moloi';
+          document.getElementById('practitioner-thuso-id').innerText = 'TH-U1';
+          const cached = localStorage.getItem('thuso_patient_records');
+          const records = cached ? JSON.parse(cached) : [];
+          renderPractitionerRecordsList(records);
+          resultsContainer.classList.remove('hidden');
+          showToast('Showing offline cached records for TH-U1.', 'info');
+        } else {
+          errorContainer.innerText = 'Patient lookup requires an online connection.';
+          errorContainer.classList.remove('hidden');
+        }
         return;
       }
 
@@ -2008,7 +2896,7 @@ function initPractitionerPassport() {
         let resolvedId = patientId;
         let resolvedName = null;
         if (!resolvedId) {
-          const findRes = await fetch(`${CONFIG.API_BASE}/users/find-by-email?email=${encodeURIComponent(patientInput)}`);
+          const findRes = await authFetch(`${CONFIG.API_BASE}/users/find-by-email?email=${encodeURIComponent(patientInput)}`);
           const findData = await findRes.json();
           if (findData.success) {
             resolvedId = findData.patient.id;
@@ -2023,14 +2911,14 @@ function initPractitionerPassport() {
         const queryParams = new URLSearchParams({ doctorId: state.loggedInUser.id });
         if (pin) queryParams.append('pin', pin);
 
-        const response = await fetch(`${CONFIG.API_BASE}/patients/${resolvedId}/records?${queryParams.toString()}`);
+        const response = await authFetch(`${CONFIG.API_BASE}/patients/${resolvedId}/records?${queryParams.toString()}`);
         const data = await response.json();
 
         if (data.success) {
           currentLookupPatientId = resolvedId;
           
           // Get patient name and ThusoID
-          const consentRes = await fetch(`${CONFIG.API_BASE}/patients/${resolvedId}/consent`);
+          const consentRes = await authFetch(`${CONFIG.API_BASE}/patients/${resolvedId}/consent`);
           const consentData = await consentRes.json();
           const thusoId = (consentData.success && consentData.consent.thuso_id_hash) ? consentData.consent.thuso_id_hash : `TH-${resolvedId.toUpperCase()}`;
 
@@ -2077,34 +2965,58 @@ function initPractitionerPassport() {
         medication_prescribed
       };
 
+      const newRecord = {
+        id: `local-${Date.now()}`,
+        doctor_name: state.loggedInUser ? state.loggedInUser.name : 'Dr. (Offline)',
+        clinic_name: state.loggedInUser ? (state.loggedInUser.clinic_name || 'Clinic') : 'Clinic',
+        diagnosis,
+        treatment_plan,
+        medication_prescribed,
+        created_at: new Date().toISOString(),
+        file_url_r2: null
+      };
+
+      const saveLocally = () => {
+        const key = currentLookupPatientId === 'u1' ? 'thuso_patient_records' : `thuso_records_${currentLookupPatientId}`;
+        const existing = JSON.parse(localStorage.getItem(key) || '[]');
+        existing.unshift(newRecord);
+        localStorage.setItem(key, JSON.stringify(existing));
+      };
+
       if (!state.isOnline) {
-        showToast("Consultation summary must be saved while online.", "error");
+        saveLocally();
+        showToast("Saved offline — will sync when connection is restored.", "info");
+        document.getElementById('consult-diagnosis').value = '';
+        document.getElementById('consult-treatment').value = '';
+        document.getElementById('consult-prescription').value = '';
+        document.getElementById('btn-lookup-passport').click();
         return;
       }
 
       try {
-        const response = await fetch(`${CONFIG.API_BASE}/patients/${currentLookupPatientId}/records`, {
+        const response = await authFetch(`${CONFIG.API_BASE}/patients/${currentLookupPatientId}/records`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
         const data = await response.json();
 
         if (data.success) {
+          saveLocally();
           showToast("Consultation summary added and synced successfully!", "success");
-          
-          // Clear form fields
           document.getElementById('consult-diagnosis').value = '';
           document.getElementById('consult-treatment').value = '';
           document.getElementById('consult-prescription').value = '';
-          
-          // Re-trigger patient lookup to display updated timeline
           document.getElementById('btn-lookup-passport').click();
         } else {
           showToast(data.error || "Failed to save record.", "error");
         }
       } catch (err) {
-        showToast("Server error writing to Patient Health Passport.", "error");
+        saveLocally();
+        showToast("Saved locally — server sync failed.", "info");
+        document.getElementById('consult-diagnosis').value = '';
+        document.getElementById('consult-treatment').value = '';
+        document.getElementById('consult-prescription').value = '';
+        document.getElementById('btn-lookup-passport').click();
       }
     });
   }
@@ -2120,23 +3032,36 @@ function renderPractitionerRecordsList(records) {
   }
 
   container.innerHTML = '';
-  records.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  const sorted = [...records].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
-  records.forEach(rec => {
-    const daysAgo = Math.round((Date.now() - new Date(rec.created_at)) / 86400000);
-    const timeText = daysAgo === 0 ? 'Today' : daysAgo === 1 ? 'Yesterday' : `${daysAgo} days ago`;
+  sorted.forEach((rec, i) => {
+    const visitDate = new Date(rec.created_at);
+    const dateStr = visitDate.toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' });
+    const timeStr = visitDate.toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' });
+    const visitType = rec.visit_type || 'GP Consultation';
 
     const div = document.createElement('div');
     div.className = 'timeline-item';
     div.innerHTML = `
       <div class="timeline-header">
-        <span class="timeline-doctor">${rec.doctor_name} (${rec.clinic_name})</span>
-        <span>${timeText}</span>
+        <div class="timeline-header-left">
+          <span class="timeline-visit-num">${sorted.length - i}</span>
+          <div>
+            <div class="timeline-doctor"><i class="fa-solid fa-user-doctor" style="font-size:0.7rem;color:var(--color-primary);margin-right:3px;"></i>${rec.doctor_name}</div>
+            <div class="timeline-clinic">${rec.clinic_name}</div>
+          </div>
+        </div>
+        <div style="text-align:right;flex-shrink:0;">
+          <div class="timeline-date-badge"><i class="fa-regular fa-calendar"></i> ${dateStr}</div>
+          <div style="font-size:0.6rem;color:var(--text-muted);margin-top:2px;">
+            <i class="fa-regular fa-clock"></i> ${timeStr} &nbsp;·&nbsp; ${visitType}
+          </div>
+        </div>
       </div>
       <div class="timeline-body">
         <p><strong>Diagnosis:</strong> ${rec.diagnosis}</p>
-        ${rec.treatment_plan ? `<p><strong>Plan:</strong> ${rec.treatment_plan}</p>` : ''}
-        ${rec.medication_prescribed ? `<p><strong>Prescription:</strong> ${rec.medication_prescribed}</p>` : ''}
+        ${rec.treatment_plan ? `<p><strong>Treatment:</strong> ${rec.treatment_plan}</p>` : ''}
+        ${rec.medication_prescribed ? `<p><strong>Prescribed:</strong> ${rec.medication_prescribed}</p>` : ''}
       </div>
     `;
     container.appendChild(div);

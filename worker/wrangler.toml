@@ -1,0 +1,36 @@
+# Thuso Health — Cloudflare Worker (API)
+# ─────────────────────────────────────────────────────────────────────────────
+# SETUP STEPS:
+#
+#  1. Install deps:       cd worker && npm install
+#  2. Login to CF:        wrangler login
+#  3. Create D1 DB:       npm run db:create
+#     → Copy the database_id from output and paste below in [[d1_databases]]
+#  4. Apply schema:       npm run db:schema
+#  5. Deploy worker:      npm run deploy
+#  6. Seed demo data:     curl -X POST https://YOUR_WORKER_URL/api/admin/seed?secret=YOUR_SEED_SECRET
+#  7. Update frontend:    Set WORKER_URL in frontend/app.js to YOUR_WORKER_URL
+#
+# ENVIRONMENT VARIABLES (set in Cloudflare Dashboard > Workers > Settings > Variables):
+#   JWT_SECRET          — Strong secret for signing JWTs (change from default!)
+#   SEED_SECRET         — One-time seed endpoint protection key
+#   GOOGLE_MAPS_API_KEY — (Optional) Add later for real distance/travel times
+# ─────────────────────────────────────────────────────────────────────────────
+
+name = "thuso-health-api"
+main = "src/index.js"
+compatibility_date = "2024-09-23"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "thuso-health-db"
+database_id = "880c2842-5f7a-4420-a073-dde97f0c0d61"
+
+[vars]
+JWT_SECRET = "thuso-health-change-this-to-a-strong-secret-in-cf-dashboard"
+SEED_SECRET = "thuso-seed-change-this-too"
+ENVIRONMENT = "production"
+# ORS_API_KEY = "ADD_VIA_CF_DASHBOARD"  ← Get free key at openrouteservice.org (no credit card)
+
+[dev]
+port = 8787

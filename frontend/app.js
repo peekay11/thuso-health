@@ -652,13 +652,13 @@ function showTab(name) {
   if (panel) panel.classList.add('tab-active');
 
   // Desktop nav active states
-  ['clinics', 'profile', 'settings'].forEach(t => {
+  ['clinics', 'profile', 'education'].forEach(t => {
     const el = document.getElementById('nav-' + t);
     if (el) el.classList.toggle('nav-link--active', t === name);
   });
 
   // Mobile tab bar active states
-  ['clinics', 'profile', 'settings'].forEach(t => {
+  ['clinics', 'profile', 'education'].forEach(t => {
     const el = document.getElementById('mob-tab-' + t);
     if (el) el.classList.toggle('mob-tab-active', t === name);
   });
@@ -2235,7 +2235,16 @@ function initPatientAuth() {
     });
   }
 
-  // Sign-out button
+  // Profile tab sign-out button
+  const logoutBtnProfile = document.getElementById('btn-patient-logout-profile');
+  if (logoutBtnProfile) {
+    logoutBtnProfile.style.display = 'inline-flex';
+    logoutBtnProfile.addEventListener('click', () => {
+      document.getElementById('btn-patient-logout')?.click();
+    });
+  }
+
+  // Sign-out button (hidden in DOM for JS compat)
   const logoutBtn = document.getElementById('btn-patient-logout');
   if (logoutBtn) {
     logoutBtn.addEventListener('click', () => {

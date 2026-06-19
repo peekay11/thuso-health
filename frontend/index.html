@@ -140,71 +140,39 @@
   <header class="site-header">
     <div class="navbar">
 
-      <!-- Brand -->
       <a class="navbar-brand" href="landing.html">
         <img src="full_logo.png" alt="Thuso Health" class="logo-img">
       </a>
 
-      <!-- Primary Nav Links (desktop) -->
       <nav class="navbar-nav" id="navbar-nav">
         <a href="#" class="nav-link nav-link--primary nav-link--active" id="nav-clinics" onclick="showTab('clinics'); return false;">
           <i class="fa-solid fa-map-location-dot"></i>
-          <span>Nearby Clinics</span>
+          <span>Clinics</span>
         </a>
         <a href="#" class="nav-link nav-link--primary" id="nav-profile" onclick="showTab('profile'); return false;">
-          <i class="fa-solid fa-circle-user"></i>
-          <span>View Profile</span>
+          <i class="fa-solid fa-id-card"></i>
+          <span>Passport</span>
         </a>
-        <a href="#" class="nav-link nav-link--primary" id="nav-settings" onclick="showTab('settings'); return false;">
-          <i class="fa-solid fa-gear"></i>
-          <span>Settings</span>
+        <a href="#" class="nav-link nav-link--primary" id="nav-education" onclick="showTab('education'); return false;">
+          <i class="fa-solid fa-graduation-cap"></i>
+          <span>Learn</span>
         </a>
       </nav>
 
-      <!-- Right rail -->
       <div class="navbar-right">
-
-        <!-- Status chips -->
-        <div class="navbar-status">
-          <span class="status-chip status-chip--data" title="Zero-rated on local ISPs">
-            <i class="fa-solid fa-bolt"></i>
-            <span>Data-Free</span>
-          </span>
-          <span id="connection-badge" class="status-chip status-chip--online">
-            <span class="pulse-dot"></span>
-            <span id="connection-text">Online</span>
-          </span>
-          <button id="sync-btn" class="btn btn-sync btn-sm hidden" title="Sync offline operations">
-            <i class="fa-solid fa-arrows-rotate"></i>
-            <span id="sync-count">0</span>
-          </button>
-        </div>
-
-        <div class="navbar-divider"></div>
-
-        <!-- Providers link -->
-        <a href="healthcare.html" class="nav-link">
-          <i class="fa-solid fa-user-doctor"></i>
-          <span>Providers</span>
-        </a>
-
-        <!-- User section — shown after login -->
-        <div class="navbar-user" id="navbar-user-section">
-          <span id="patient-greeting" class="navbar-greeting" style="display:none;">
-            <i class="fa-solid fa-circle-user"></i>
-            <span id="patient-greeting-name"></span>
-          </span>
-          <button id="btn-patient-logout" class="btn btn-ghost-sm" style="display:none;" title="Sign out">
-            <i class="fa-solid fa-right-from-bracket"></i> Sign out
-          </button>
-        </div>
-
-        <!-- Mobile hamburger -->
-        <button class="navbar-hamburger" id="navbar-hamburger" aria-label="Open menu" onclick="document.getElementById('navbar-nav').classList.toggle('nav-open');">
-          <span></span><span></span><span></span>
+        <span id="connection-badge" class="status-chip status-chip--online">
+          <span class="pulse-dot"></span>
+          <span id="connection-text">Online</span>
+        </span>
+        <button id="sync-btn" class="btn btn-sync btn-sm hidden" title="Sync offline operations">
+          <i class="fa-solid fa-arrows-rotate"></i>
+          <span id="sync-count">0</span>
         </button>
-
+        <!-- Hidden elements kept for JS compatibility -->
+        <span id="patient-greeting" style="display:none;"><span id="patient-greeting-name"></span></span>
+        <button id="btn-patient-logout" style="display:none;"></button>
       </div>
+
     </div>
   </header>
 
@@ -468,6 +436,15 @@
             </button>
           </div>
           <div class="audit-log-container hidden" id="audit-logs-list"></div>
+
+          <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border-color);display:flex;justify-content:space-between;align-items:center;">
+            <a href="healthcare.html" class="btn btn-outline btn-sm">
+              <i class="fa-solid fa-user-doctor"></i> Provider Portal
+            </a>
+            <button id="btn-patient-logout-profile" class="btn btn-cancel btn-sm" style="display:none;">
+              <i class="fa-solid fa-right-from-bracket"></i> Sign Out
+            </button>
+          </div>
         </div>
 
       </div>
@@ -549,6 +526,188 @@
       </div>
     </div><!-- /tab-settings -->
 
+
+    <!-- ═══════════════════════════════════════════════
+         TAB 4 — LEARN / HEALTH EDUCATION
+    ═══════════════════════════════════════════════ -->
+    <div id="tab-education" class="tab-panel">
+      <div class="tab-content-wrap">
+
+        <div class="section-title-container">
+          <h2>Health Education</h2>
+          <p style="font-size:0.82rem;color:var(--text-muted);margin-top:0.25rem;">Free courses to help you understand, prevent and manage common conditions.</p>
+        </div>
+
+        <!-- TB -->
+        <div class="edu-card">
+          <div class="edu-card-banner edu-banner-tb">
+            <i class="fa-solid fa-lungs"></i>
+          </div>
+          <div class="edu-card-body">
+            <div class="edu-card-meta">
+              <span class="edu-badge edu-badge-tb">Tuberculosis</span>
+              <span class="edu-badge edu-badge-level">Beginner · 15 min</span>
+            </div>
+            <h3 class="edu-card-title">Understanding TB — Causes, Symptoms & Prevention</h3>
+            <p class="edu-card-desc">TB is the leading infectious disease killer in South Africa. Learn how it spreads, what the symptoms look like, and how to protect yourself and your family.</p>
+            <ul class="edu-card-points">
+              <li>What is Mycobacterium tuberculosis?</li>
+              <li>Airborne transmission &amp; risk factors</li>
+              <li>Symptoms: persistent cough, night sweats, weight loss</li>
+              <li>TB vs Drug-Resistant TB (MDR-TB / XDR-TB)</li>
+              <li>Free treatment available at all government clinics</li>
+            </ul>
+            <div class="edu-card-actions">
+              <a href="https://www.youtube.com/watch?v=4IxSMnwNHsE" target="_blank" class="btn btn-primary btn-sm edu-watch-btn">
+                <i class="fa-brands fa-youtube"></i> Watch on YouTube
+              </a>
+              <a href="https://www.nicd.ac.za/diseases-a-z-index/tuberculosis/" target="_blank" class="btn btn-outline btn-sm">
+                <i class="fa-solid fa-arrow-up-right-from-square"></i> NICD Resource
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <!-- HIV -->
+        <div class="edu-card">
+          <div class="edu-card-banner edu-banner-hiv">
+            <i class="fa-solid fa-ribbon"></i>
+          </div>
+          <div class="edu-card-body">
+            <div class="edu-card-meta">
+              <span class="edu-badge edu-badge-hiv">HIV &amp; AIDS</span>
+              <span class="edu-badge edu-badge-level">Beginner · 20 min</span>
+            </div>
+            <h3 class="edu-card-title">HIV — What It Is, How It Spreads &amp; Living Well with ARVs</h3>
+            <p class="edu-card-desc">South Africa has the largest HIV-positive population in the world. Understanding HIV is the first step to prevention, testing, and accessing life-saving treatment.</p>
+            <ul class="edu-card-points">
+              <li>How HIV attacks the immune system (CD4 cells)</li>
+              <li>Transmission: sexual contact, blood, mother-to-child</li>
+              <li>Prevention: condoms, PrEP, voluntary circumcision</li>
+              <li>The difference between HIV and AIDS</li>
+              <li>ARV therapy — undetectable = untransmittable (U=U)</li>
+              <li>Free testing &amp; ARVs at all DoH clinics</li>
+            </ul>
+            <div class="edu-card-actions">
+              <a href="https://www.youtube.com/watch?v=0sfZoVVSqPs" target="_blank" class="btn btn-primary btn-sm edu-watch-btn">
+                <i class="fa-brands fa-youtube"></i> Watch on YouTube
+              </a>
+              <a href="https://www.sahivsoc.org/" target="_blank" class="btn btn-outline btn-sm">
+                <i class="fa-solid fa-arrow-up-right-from-square"></i> SAHIV Society
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Diabetes -->
+        <div class="edu-card">
+          <div class="edu-card-banner edu-banner-diabetes">
+            <i class="fa-solid fa-droplet"></i>
+          </div>
+          <div class="edu-card-body">
+            <div class="edu-card-meta">
+              <span class="edu-badge edu-badge-diabetes">Diabetes</span>
+              <span class="edu-badge edu-badge-level">Beginner · 12 min</span>
+            </div>
+            <h3 class="edu-card-title">Type 2 Diabetes — Prevention, Diet &amp; Medication</h3>
+            <p class="edu-card-desc">Diabetes affects 4.2 million South Africans and is largely preventable. Learn to recognise early warning signs and how lifestyle changes can reverse prediabetes.</p>
+            <ul class="edu-card-points">
+              <li>How insulin resistance develops</li>
+              <li>Warning signs: thirst, frequent urination, blurred vision</li>
+              <li>Foods to eat &amp; avoid</li>
+              <li>Exercise as medicine — 30 min walks reduce risk by 30%</li>
+              <li>Metformin &amp; monitoring blood sugar at home</li>
+            </ul>
+            <div class="edu-card-actions">
+              <a href="https://www.youtube.com/watch?v=vIDALT1fmfk" target="_blank" class="btn btn-primary btn-sm edu-watch-btn">
+                <i class="fa-brands fa-youtube"></i> Watch on YouTube
+              </a>
+              <a href="https://www.diabetessa.org.za/" target="_blank" class="btn btn-outline btn-sm">
+                <i class="fa-solid fa-arrow-up-right-from-square"></i> Diabetes SA
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Mental Health -->
+        <div class="edu-card">
+          <div class="edu-card-banner edu-banner-mental">
+            <i class="fa-solid fa-brain"></i>
+          </div>
+          <div class="edu-card-body">
+            <div class="edu-card-meta">
+              <span class="edu-badge edu-badge-mental">Mental Health</span>
+              <span class="edu-badge edu-badge-level">Beginner · 18 min</span>
+            </div>
+            <h3 class="edu-card-title">Mental Health in South Africa — Depression, Anxiety &amp; Getting Help</h3>
+            <p class="edu-card-desc">One in six South Africans will experience a mental health disorder in their lifetime. Learn the signs and where to get free, confidential support.</p>
+            <ul class="edu-card-points">
+              <li>Depression vs sadness — knowing the difference</li>
+              <li>Anxiety disorders &amp; panic attacks</li>
+              <li>Impact of unemployment &amp; poverty on mental health</li>
+              <li>Talking to a community health worker (CHW)</li>
+              <li>SADAG helpline: 0800 567 567 (free, 24/7)</li>
+            </ul>
+            <div class="edu-card-actions">
+              <a href="https://www.youtube.com/watch?v=NeEe3bCFD-E" target="_blank" class="btn btn-primary btn-sm edu-watch-btn">
+                <i class="fa-brands fa-youtube"></i> Watch on YouTube
+              </a>
+              <a href="https://www.sadag.org/" target="_blank" class="btn btn-outline btn-sm">
+                <i class="fa-solid fa-arrow-up-right-from-square"></i> SADAG
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Child Vaccines -->
+        <div class="edu-card">
+          <div class="edu-card-banner edu-banner-vaccine">
+            <i class="fa-solid fa-syringe"></i>
+          </div>
+          <div class="edu-card-body">
+            <div class="edu-card-meta">
+              <span class="edu-badge edu-badge-vaccine">Vaccinations</span>
+              <span class="edu-badge edu-badge-level">Parents · 8 min</span>
+            </div>
+            <h3 class="edu-card-title">SA Childhood Vaccination Schedule — What, When &amp; Why</h3>
+            <p class="edu-card-desc">All childhood vaccines are free at government clinics. Knowing the schedule protects your child from measles, polio, meningitis and more.</p>
+            <ul class="edu-card-points">
+              <li>Birth: BCG (TB) + OPV (Polio)</li>
+              <li>6 weeks – 14 weeks: DTaP, Hib, Hep B, PCV, Rotavirus</li>
+              <li>9 months: Measles + Vitamin A</li>
+              <li>Why herd immunity matters for your community</li>
+              <li>Road-to-Health booklet — keep it safe</li>
+            </ul>
+            <div class="edu-card-actions">
+              <a href="https://www.youtube.com/watch?v=Pb5HWJaVLvo" target="_blank" class="btn btn-primary btn-sm edu-watch-btn">
+                <i class="fa-brands fa-youtube"></i> Watch on YouTube
+              </a>
+              <a href="https://www.health.gov.za/vaccination/" target="_blank" class="btn btn-outline btn-sm">
+                <i class="fa-solid fa-arrow-up-right-from-square"></i> DoH Vaccines
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Emergency numbers -->
+        <div class="card" style="margin-top:0.5rem;background:linear-gradient(135deg,#fff7ed,#fff);border-left:4px solid #f97316;">
+          <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.75rem;">
+            <i class="fa-solid fa-phone-volume" style="color:#f97316;font-size:1.1rem;"></i>
+            <h4 style="margin:0;font-size:0.95rem;">Emergency &amp; Health Helplines</h4>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;font-size:0.78rem;">
+            <div><strong>Medical Emergency</strong><br><a href="tel:10177" style="color:var(--color-primary);">10177</a></div>
+            <div><strong>Mental Health (SADAG)</strong><br><a href="tel:0800567567" style="color:var(--color-primary);">0800 567 567</a></div>
+            <div><strong>AIDS Helpline</strong><br><a href="tel:0800012322" style="color:var(--color-primary);">0800 012 322</a></div>
+            <div><strong>TB Hotline</strong><br><a href="tel:0800909090" style="color:var(--color-primary);">0800 909 090</a></div>
+            <div><strong>Poison Control</strong><br><a href="tel:0861555777" style="color:var(--color-primary);">0861 555 777</a></div>
+            <div><strong>Gender Violence</strong><br><a href="tel:0800428428" style="color:var(--color-primary);">0800 428 428</a></div>
+          </div>
+        </div>
+
+      </div>
+    </div><!-- /tab-education -->
+
   </main>
 
   <!-- Mobile Bottom Tab Bar -->
@@ -558,12 +717,12 @@
       <span>Clinics</span>
     </button>
     <button class="mob-tab-btn" id="mob-tab-profile" onclick="showTab('profile')">
-      <i class="fa-solid fa-circle-user"></i>
-      <span>Profile</span>
+      <i class="fa-solid fa-id-card"></i>
+      <span>Passport</span>
     </button>
-    <button class="mob-tab-btn" id="mob-tab-settings" onclick="showTab('settings')">
-      <i class="fa-solid fa-gear"></i>
-      <span>Settings</span>
+    <button class="mob-tab-btn" id="mob-tab-education" onclick="showTab('education')">
+      <i class="fa-solid fa-graduation-cap"></i>
+      <span>Learn</span>
     </button>
   </nav>
 

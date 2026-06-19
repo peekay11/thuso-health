@@ -2685,3 +2685,111 @@ input:checked + .slider:before {
   cursor: pointer;
 }
 .eskom-filter-link:hover { opacity: 0.8; }
+
+/* ── Education Tab ─────────────────────────────────────────── */
+.edu-card {
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.07);
+  overflow: hidden;
+  margin-bottom: 1.25rem;
+  border: 1px solid var(--border-color);
+}
+
+.edu-card-banner {
+  height: 70px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  color: rgba(255,255,255,0.9);
+}
+.edu-banner-tb       { background: linear-gradient(135deg, #1d4ed8, #3b82f6); }
+.edu-banner-hiv      { background: linear-gradient(135deg, #be123c, #f43f5e); }
+.edu-banner-diabetes { background: linear-gradient(135deg, #b45309, #f59e0b); }
+.edu-banner-mental   { background: linear-gradient(135deg, #6d28d9, #8b5cf6); }
+.edu-banner-vaccine  { background: linear-gradient(135deg, #065f46, #10b981); }
+
+.edu-card-body {
+  padding: 1rem;
+}
+
+.edu-card-meta {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.6rem;
+}
+
+.edu-badge {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 999px;
+}
+.edu-badge-tb       { background: #dbeafe; color: #1d4ed8; }
+.edu-badge-hiv      { background: #ffe4e6; color: #be123c; }
+.edu-badge-diabetes { background: #fef3c7; color: #b45309; }
+.edu-badge-mental   { background: #ede9fe; color: #6d28d9; }
+.edu-badge-vaccine  { background: #d1fae5; color: #065f46; }
+.edu-badge-level    { background: #f1f5f9; color: #64748b; }
+
+.edu-card-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-main);
+  margin: 0 0 0.4rem;
+  line-height: 1.35;
+}
+
+.edu-card-desc {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  line-height: 1.55;
+  margin: 0 0 0.75rem;
+}
+
+.edu-card-points {
+  padding-left: 1.1rem;
+  margin: 0 0 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.edu-card-points li {
+  font-size: 0.76rem;
+  color: var(--text-main);
+  line-height: 1.4;
+}
+
+.edu-card-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.edu-watch-btn {
+  background: #ff0000;
+  border-color: #ff0000;
+  color: #fff;
+}
+.edu-watch-btn:hover { background: #cc0000; border-color: #cc0000; }
+
+.btn-outline {
+  background: transparent;
+  border: 1.5px solid var(--border-color);
+  color: var(--text-main);
+  padding: 0.38rem 0.85rem;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  transition: border-color 0.15s, color 0.15s;
+}
+.btn-outline:hover { border-color: var(--color-primary); color: var(--color-primary); }

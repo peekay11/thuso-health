@@ -1,83 +1,180 @@
-# Thuso Health - Smart Queue & Clinic Booking MVP
+# Thuso Health
 
-Thuso Health is a location-aware, offline-resilient healthcare booking application designed to reduce wait times at nearby health clinics by coordinating travel duration, wait times, and appointment scheduling.
+Thuso Health is a simple healthcare booking system that helps patients find the nearest clinic, reserve a slot, and manage visits while also giving clinic staff a queue dashboard.
 
-## Features
-
-- **Location-Based Distance & Travel Calculation**: Computes proximity to clinic using Haversine formula (supports full offline functionality) with structural hooks for Google Maps APIs.
-- **Smart Queue Waiting Room**: Dynamically ranks clinics by "Total Time" (Travel Time + Waiting Room Queue wait time), helping patients decide which clinic has the shortest queue/travel compromise.
-- **Offline Mode & Synchronization**: Bookings created while the server is offline are cached locally in the browser's `LocalStorage`. When the system detects the network is restored, it prompts the user to synchronize the bookings with the central Express database.
-- **Unit Tests**: Full unit tests verifying API endpoints and queue logic.
+The app is designed to work both online and offline, so users can still book or view information even when the network is unstable.
 
 ---
 
-## Directory Structure
+## What this project does
 
-```
+- Helps patients compare clinics using travel time, waiting time, and total time.
+- Shows clinic congestion levels so users can understand how busy a clinic is.
+- Displays the power status of each clinic (grid power or backup power).
+- Lets patients book appointments and view their booking history.
+- Gives healthcare staff a dashboard to check in, complete, or cancel bookings.
+- Supports offline behavior with local storage and sync when the connection returns.
+
+---
+
+## Main features
+ 
+- Clinic search and sorting by distance, wait time, or total time
+- Congestion and queue load indicators for each clinic
+- Power station / power availability status for each clinic
+- Travel time estimates based on location and clinic distance
+- Patient login and registration
+- Booking modal with appointment timing advice
+- Active booking and booking history views
+- Healthcare provider dashboard
+- Offline queue syncing
+- Basic health passport / consent workflow
+
+---
+
+## Tech stack
+
+- **Frontend:** HTML, CSS, JavaScript
+- **Backend:** Node.js, Express
+- **Testing:** Jest, Supertest
+- **Offline support:** Browser local storage
+
+---
+
+## Project structure
+
+```text
 thuso-health/
-├── backend/                  # MVC Express API
+├── backend/
 │   ├── src/
-│   │   ├── controllers/      # Route logic handlers
-│   │   ├── models/           # DB schema mock and queries
-│   │   ├── routes/           # Endpoint mappings
-│   │   ├── services/         # Queue wait time algorithms & maps service
-│   │   ├── app.js            # Express app configuration
-│   │   └── server.js         # Port listener launcher
-│   ├── tests/                # Jest + Supertest suite
-│   ├── package.json
-│   └── package-lock.json
-│
-└── frontend/                 # Client UI (works offline)
-    ├── index.html            # Main UI Layout
-    ├── style.css             # Glassmorphic premium CSS styling
-    ├── app.js                # State management and offline sync engine
-    ├── package.json          # Light http-server dev package
-    └── package-lock.json
+│   │   ├── controllers/
+│   │   ├── middleware/
+│   │   ├── models/
+│   │   ├── routes/
+│   │   ├── services/
+│   │   ├── app.js
+│   │   └── server.js
+│   └── tests/
+└── frontend/
+    ├── index.html
+    ├── healthcare.html
+    ├── app.js
+    └── style.css
 ```
 
 ---
 
-## Running the Application
+## Getting started
 
-### Prerequisite
+### 1. Install Node.js
 
-- [Node.js](https://nodejs.org/) (v16+ recommended)
+Make sure you have Node.js installed.
 
-### Step 1: Start the Backend Server
+Recommended version: 16 or newer
 
-1. Open a terminal and navigate to the `backend/` directory:
-   ```bash
-   cd backend
-   ```
-2. Run the development script:
-   ```bash
-   npm run dev
-   ```
-   The backend runs on `http://localhost:5000`.
+### 2. Install dependencies
 
-### Step 2: Start the Frontend Application
+Open two terminals:
 
-1. Open a new terminal and navigate to the `frontend/` directory:
-   ```bash
-   cd frontend
-   ```
-2. Start the static file server:
-   ```bash
-   npm run dev
-   ```
-   The frontend runs on `http://localhost:3000`. Open this address in your web browser.
+#### Backend
+```bash
+cd backend
+npm install
+```
+
+#### Frontend
+```bash
+cd frontend
+npm install
+```
 
 ---
 
-## Running the Unit Tests
+## Running the app
 
-The backend includes a comprehensive Jest unit test suite.
+### Start the backend
 
-1. Navigate to the `backend/` directory:
-   ```bash
-   cd backend
-   ```
-2. Run the test command:
-   ```bash
-   npm run test
-   ```
+From the backend folder:
+
+```bash
+npm run dev
+```
+
+The API will run at:
+
+```text
+http://localhost:5000
+```
+
+### Start the frontend
+
+From the frontend folder:
+
+```bash
+npm run dev
+```
+
+The UI will run at:
+
+```text
+http://localhost:3000
+```
+
+---
+
+## Demo login options
+
+You can use these sample accounts during development:
+
+### Patient
+- Email: `paseka@thuso.health`
+- Password: `password123`
+
+### Healthcare provider
+- Email: `sarah@thuso.health`
+- Password: `password123`
+
+---
+
+## Running tests
+
+From the backend folder:
+
+```bash
+npm run test
+```
+
+This runs the backend test suite for routes, controllers, services, and middleware.
+
+---
+
+## How the system works
+
+1. A patient opens the frontend and chooses a clinic.
+2. The app calculates travel time, estimated wait time, and total time.
+3. The patient books a slot and gets a queue number.
+4. The booking is saved locally if the network is unavailable.
+5. When the connection returns, the app syncs pending bookings and updates.
+6. Healthcare staff can log in to the provider portal and manage the queue.
+
+---
+
+## Notes about offline behavior
+
+If the app loses internet access:
+
+- bookings may be saved locally
+- the UI continues to work using stored data
+- the sync button will appear when the connection is restored
+
+---
+
+## Contributing
+
+If you want to improve the project:
+
+1. Create a new branch
+2. Make your changes
+3. Test the backend
+4. Open a pull request
+

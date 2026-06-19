@@ -6,29 +6,43 @@ The app is designed to work both online and offline, so users can still book or 
 
 ---
 
-## What this project does
+## Problem statement
 
-- Helps patients compare clinics using travel time, waiting time, and total time.
-- Shows clinic congestion levels so users can understand how busy a clinic is.
-- Displays the power status of each clinic (grid power or backup power).
-- Lets patients book appointments and view their booking history.
-- Gives healthcare staff a dashboard to check in, complete, or cancel bookings.
-- Supports offline behavior with local storage and sync when the connection returns.
+Many patients struggle to choose the right clinic because they do not know which one is:
+
+- closest to them
+- least crowded
+- most reliable in terms of power and operating conditions
+- quickest to reach given travel time and queue delays
+
+This often leads to wasted time, long waits, and poor decision-making when people need urgent care.
+
+## What this project is solving .. solution statement
+
+Thuso Health helps patients make faster and smarter clinic decisions by combining:
+
+- travel time estimates
+- queue congestion information
+- clinic power availability
+- booking support for both online and offline situations
+
+The goal is to reduce uncertainty and help people reach a clinic that is both practical and efficient.
 
 ---
 
-## Main features
- 
-- Clinic search and sorting by distance, wait time, or total time
-- Congestion and queue load indicators for each clinic
-- Power station / power availability status for each clinic
-- Travel time estimates based on location and clinic distance
-- Patient login and registration
-- Booking modal with appointment timing advice
-- Active booking and booking history views
-- Healthcare provider dashboard
-- Offline queue syncing
-- Basic health passport / consent workflow
+## Implementation logic
+
+The application works in the following way:
+
+1. The frontend loads clinic data and the user's selected location.
+2. The system calculates the distance between the user and each clinic.
+3. It estimates travel time and combines that with current queue conditions.
+4. It shows clinic congestion, power status, and total expected time.
+5. The patient can choose a clinic, reserve a booking, and view their active ticket.
+6. If the network is unavailable, the booking is saved locally and synced later.
+7. Clinic staff can log in to manage bookings, check patients in, and update queue status.
+
+This logic helps the app present a clear recommendation for which clinic is the best option at that moment.
 
 ---
 

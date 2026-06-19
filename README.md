@@ -1,6 +1,6 @@
 # Thuso Health
 
-Thuso Health is a simple healthcare booking system that helps patients find the nearest clinic, reserve a slot, and manage visits while also giving clinic staff a queue dashboard.
+Thuso Health is a simple healthcare system that helps patients find the nearest clinic and manage visits while also giving clinic staff a queue dashboard.
 
 The app is designed to work both online and offline, so users can still book or view information even when the network is unstable.
 

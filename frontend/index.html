@@ -533,164 +533,232 @@
     <div id="tab-education" class="tab-panel">
       <div class="tab-content-wrap">
 
-        <div class="section-title-container">
+        <div class="section-title-container" style="margin-bottom:0.75rem;">
           <h2>Health Education</h2>
-          <p style="font-size:0.82rem;color:var(--text-muted);margin-top:0.25rem;">Free courses to help you understand, prevent and manage common conditions.</p>
+          <p style="font-size:0.82rem;color:var(--text-muted);margin-top:0.25rem;">Free videos to help you understand, prevent and manage common conditions.</p>
         </div>
 
-        <!-- TB -->
-        <div class="edu-card">
-          <div class="edu-card-banner edu-banner-tb">
-            <i class="fa-solid fa-lungs"></i>
-          </div>
-          <div class="edu-card-body">
-            <div class="edu-card-meta">
-              <span class="edu-badge edu-badge-tb">Tuberculosis</span>
-              <span class="edu-badge edu-badge-level">Beginner · 15 min</span>
-            </div>
-            <h3 class="edu-card-title">Understanding TB — Causes, Symptoms & Prevention</h3>
-            <p class="edu-card-desc">TB is the leading infectious disease killer in South Africa. Learn how it spreads, what the symptoms look like, and how to protect yourself and your family.</p>
-            <ul class="edu-card-points">
-              <li>What is Mycobacterium tuberculosis?</li>
-              <li>Airborne transmission &amp; risk factors</li>
-              <li>Symptoms: persistent cough, night sweats, weight loss</li>
-              <li>TB vs Drug-Resistant TB (MDR-TB / XDR-TB)</li>
-              <li>Free treatment available at all government clinics</li>
-            </ul>
-            <div class="edu-card-actions">
-              <a href="https://www.youtube.com/watch?v=4IxSMnwNHsE" target="_blank" class="btn btn-primary btn-sm edu-watch-btn">
-                <i class="fa-brands fa-youtube"></i> Watch on YouTube
-              </a>
-              <a href="https://www.nicd.ac.za/diseases-a-z-index/tuberculosis/" target="_blank" class="btn btn-outline btn-sm">
-                <i class="fa-solid fa-arrow-up-right-from-square"></i> NICD Resource
-              </a>
-            </div>
-          </div>
+        <!-- Category filter chips -->
+        <div class="yt-filter-bar">
+          <button class="yt-chip active" onclick="filterEdu(this,'all')">All</button>
+          <button class="yt-chip" onclick="filterEdu(this,'tb')">Tuberculosis</button>
+          <button class="yt-chip" onclick="filterEdu(this,'hiv')">HIV &amp; AIDS</button>
+          <button class="yt-chip" onclick="filterEdu(this,'diabetes')">Diabetes</button>
+          <button class="yt-chip" onclick="filterEdu(this,'mental')">Mental Health</button>
+          <button class="yt-chip" onclick="filterEdu(this,'vaccine')">Vaccines</button>
         </div>
 
-        <!-- HIV -->
-        <div class="edu-card">
-          <div class="edu-card-banner edu-banner-hiv">
-            <i class="fa-solid fa-ribbon"></i>
-          </div>
-          <div class="edu-card-body">
-            <div class="edu-card-meta">
-              <span class="edu-badge edu-badge-hiv">HIV &amp; AIDS</span>
-              <span class="edu-badge edu-badge-level">Beginner · 20 min</span>
-            </div>
-            <h3 class="edu-card-title">HIV — What It Is, How It Spreads &amp; Living Well with ARVs</h3>
-            <p class="edu-card-desc">South Africa has the largest HIV-positive population in the world. Understanding HIV is the first step to prevention, testing, and accessing life-saving treatment.</p>
-            <ul class="edu-card-points">
-              <li>How HIV attacks the immune system (CD4 cells)</li>
-              <li>Transmission: sexual contact, blood, mother-to-child</li>
-              <li>Prevention: condoms, PrEP, voluntary circumcision</li>
-              <li>The difference between HIV and AIDS</li>
-              <li>ARV therapy — undetectable = untransmittable (U=U)</li>
-              <li>Free testing &amp; ARVs at all DoH clinics</li>
-            </ul>
-            <div class="edu-card-actions">
-              <a href="https://www.youtube.com/watch?v=0sfZoVVSqPs" target="_blank" class="btn btn-primary btn-sm edu-watch-btn">
-                <i class="fa-brands fa-youtube"></i> Watch on YouTube
-              </a>
-              <a href="https://www.sahivsoc.org/" target="_blank" class="btn btn-outline btn-sm">
-                <i class="fa-solid fa-arrow-up-right-from-square"></i> SAHIV Society
-              </a>
-            </div>
-          </div>
-        </div>
+        <!-- Video grid -->
+        <div class="yt-grid" id="edu-grid">
 
-        <!-- Diabetes -->
-        <div class="edu-card">
-          <div class="edu-card-banner edu-banner-diabetes">
-            <i class="fa-solid fa-droplet"></i>
-          </div>
-          <div class="edu-card-body">
-            <div class="edu-card-meta">
-              <span class="edu-badge edu-badge-diabetes">Diabetes</span>
-              <span class="edu-badge edu-badge-level">Beginner · 12 min</span>
-            </div>
-            <h3 class="edu-card-title">Type 2 Diabetes — Prevention, Diet &amp; Medication</h3>
-            <p class="edu-card-desc">Diabetes affects 4.2 million South Africans and is largely preventable. Learn to recognise early warning signs and how lifestyle changes can reverse prediabetes.</p>
-            <ul class="edu-card-points">
-              <li>How insulin resistance develops</li>
-              <li>Warning signs: thirst, frequent urination, blurred vision</li>
-              <li>Foods to eat &amp; avoid</li>
-              <li>Exercise as medicine — 30 min walks reduce risk by 30%</li>
-              <li>Metformin &amp; monitoring blood sugar at home</li>
-            </ul>
-            <div class="edu-card-actions">
-              <a href="https://www.youtube.com/watch?v=vIDALT1fmfk" target="_blank" class="btn btn-primary btn-sm edu-watch-btn">
-                <i class="fa-brands fa-youtube"></i> Watch on YouTube
-              </a>
-              <a href="https://www.diabetessa.org.za/" target="_blank" class="btn btn-outline btn-sm">
-                <i class="fa-solid fa-arrow-up-right-from-square"></i> Diabetes SA
-              </a>
+          <!-- TB 1 -->
+          <div class="yt-card" data-cat="tb">
+            <a href="https://www.youtube.com/watch?v=4IxSMnwNHsE" target="_blank" class="yt-thumb-wrap">
+              <img src="https://img.youtube.com/vi/4IxSMnwNHsE/hqdefault.jpg" alt="Understanding TB" class="yt-thumb" onerror="this.closest('.yt-thumb-wrap').classList.add('yt-thumb-fallback','yt-fallback-tb');this.remove()">
+              <span class="yt-duration">15:23</span>
+              <span class="yt-play-btn"><i class="fa-solid fa-play"></i></span>
+            </a>
+            <div class="yt-info">
+              <span class="yt-cat-dot yt-dot-tb"></span>
+              <div>
+                <p class="yt-title">Understanding TB — Causes, Symptoms &amp; Prevention</p>
+                <p class="yt-channel">WHO South Africa</p>
+                <p class="yt-meta">Tuberculosis · Beginner</p>
+              </div>
             </div>
           </div>
-        </div>
 
-        <!-- Mental Health -->
-        <div class="edu-card">
-          <div class="edu-card-banner edu-banner-mental">
-            <i class="fa-solid fa-brain"></i>
-          </div>
-          <div class="edu-card-body">
-            <div class="edu-card-meta">
-              <span class="edu-badge edu-badge-mental">Mental Health</span>
-              <span class="edu-badge edu-badge-level">Beginner · 18 min</span>
-            </div>
-            <h3 class="edu-card-title">Mental Health in South Africa — Depression, Anxiety &amp; Getting Help</h3>
-            <p class="edu-card-desc">One in six South Africans will experience a mental health disorder in their lifetime. Learn the signs and where to get free, confidential support.</p>
-            <ul class="edu-card-points">
-              <li>Depression vs sadness — knowing the difference</li>
-              <li>Anxiety disorders &amp; panic attacks</li>
-              <li>Impact of unemployment &amp; poverty on mental health</li>
-              <li>Talking to a community health worker (CHW)</li>
-              <li>SADAG helpline: 0800 567 567 (free, 24/7)</li>
-            </ul>
-            <div class="edu-card-actions">
-              <a href="https://www.youtube.com/watch?v=NeEe3bCFD-E" target="_blank" class="btn btn-primary btn-sm edu-watch-btn">
-                <i class="fa-brands fa-youtube"></i> Watch on YouTube
-              </a>
-              <a href="https://www.sadag.org/" target="_blank" class="btn btn-outline btn-sm">
-                <i class="fa-solid fa-arrow-up-right-from-square"></i> SADAG
-              </a>
+          <!-- TB 2 -->
+          <div class="yt-card" data-cat="tb">
+            <a href="https://www.youtube.com/watch?v=q9bMpP4XU6E" target="_blank" class="yt-thumb-wrap">
+              <img src="https://img.youtube.com/vi/q9bMpP4XU6E/hqdefault.jpg" alt="MDR-TB" class="yt-thumb" onerror="this.closest('.yt-thumb-wrap').classList.add('yt-thumb-fallback','yt-fallback-tb');this.remove()">
+              <span class="yt-duration">12:08</span>
+              <span class="yt-play-btn"><i class="fa-solid fa-play"></i></span>
+            </a>
+            <div class="yt-info">
+              <span class="yt-cat-dot yt-dot-tb"></span>
+              <div>
+                <p class="yt-title">Drug-Resistant TB (MDR-TB) — What You Need to Know</p>
+                <p class="yt-channel">NICD South Africa</p>
+                <p class="yt-meta">Tuberculosis · Intermediate</p>
+              </div>
             </div>
           </div>
-        </div>
 
-        <!-- Child Vaccines -->
-        <div class="edu-card">
-          <div class="edu-card-banner edu-banner-vaccine">
-            <i class="fa-solid fa-syringe"></i>
-          </div>
-          <div class="edu-card-body">
-            <div class="edu-card-meta">
-              <span class="edu-badge edu-badge-vaccine">Vaccinations</span>
-              <span class="edu-badge edu-badge-level">Parents · 8 min</span>
-            </div>
-            <h3 class="edu-card-title">SA Childhood Vaccination Schedule — What, When &amp; Why</h3>
-            <p class="edu-card-desc">All childhood vaccines are free at government clinics. Knowing the schedule protects your child from measles, polio, meningitis and more.</p>
-            <ul class="edu-card-points">
-              <li>Birth: BCG (TB) + OPV (Polio)</li>
-              <li>6 weeks – 14 weeks: DTaP, Hib, Hep B, PCV, Rotavirus</li>
-              <li>9 months: Measles + Vitamin A</li>
-              <li>Why herd immunity matters for your community</li>
-              <li>Road-to-Health booklet — keep it safe</li>
-            </ul>
-            <div class="edu-card-actions">
-              <a href="https://www.youtube.com/watch?v=Pb5HWJaVLvo" target="_blank" class="btn btn-primary btn-sm edu-watch-btn">
-                <i class="fa-brands fa-youtube"></i> Watch on YouTube
-              </a>
-              <a href="https://www.health.gov.za/vaccination/" target="_blank" class="btn btn-outline btn-sm">
-                <i class="fa-solid fa-arrow-up-right-from-square"></i> DoH Vaccines
-              </a>
+          <!-- TB 3 -->
+          <div class="yt-card" data-cat="tb">
+            <a href="https://www.youtube.com/watch?v=l0hI9fMbMI0" target="_blank" class="yt-thumb-wrap">
+              <img src="https://img.youtube.com/vi/l0hI9fMbMI0/hqdefault.jpg" alt="TB Stigma" class="yt-thumb" onerror="this.closest('.yt-thumb-wrap').classList.add('yt-thumb-fallback','yt-fallback-tb');this.remove()">
+              <span class="yt-duration">10:45</span>
+              <span class="yt-play-btn"><i class="fa-solid fa-play"></i></span>
+            </a>
+            <div class="yt-info">
+              <span class="yt-cat-dot yt-dot-tb"></span>
+              <div>
+                <p class="yt-title">TB Stigma &amp; How to Support Someone Living with TB</p>
+                <p class="yt-channel">TBHIV Care Foundation</p>
+                <p class="yt-meta">Tuberculosis · All levels</p>
+              </div>
             </div>
           </div>
-        </div>
+
+          <!-- HIV 1 -->
+          <div class="yt-card" data-cat="hiv">
+            <a href="https://www.youtube.com/watch?v=0sfZoVVSqPs" target="_blank" class="yt-thumb-wrap">
+              <img src="https://img.youtube.com/vi/0sfZoVVSqPs/hqdefault.jpg" alt="HIV Basics" class="yt-thumb" onerror="this.closest('.yt-thumb-wrap').classList.add('yt-thumb-fallback','yt-fallback-hiv');this.remove()">
+              <span class="yt-duration">12:45</span>
+              <span class="yt-play-btn"><i class="fa-solid fa-play"></i></span>
+            </a>
+            <div class="yt-info">
+              <span class="yt-cat-dot yt-dot-hiv"></span>
+              <div>
+                <p class="yt-title">HIV Basics — How It Spreads &amp; How to Protect Yourself</p>
+                <p class="yt-channel">UNAIDS Africa</p>
+                <p class="yt-meta">HIV &amp; AIDS · Beginner</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- HIV 2 -->
+          <div class="yt-card" data-cat="hiv">
+            <a href="https://www.youtube.com/watch?v=xLDxqHfmtSE" target="_blank" class="yt-thumb-wrap">
+              <img src="https://img.youtube.com/vi/xLDxqHfmtSE/hqdefault.jpg" alt="ARV Treatment" class="yt-thumb" onerror="this.closest('.yt-thumb-wrap').classList.add('yt-thumb-fallback','yt-fallback-hiv');this.remove()">
+              <span class="yt-duration">9:17</span>
+              <span class="yt-play-btn"><i class="fa-solid fa-play"></i></span>
+            </a>
+            <div class="yt-info">
+              <span class="yt-cat-dot yt-dot-hiv"></span>
+              <div>
+                <p class="yt-title">ARV Treatment — Undetectable = Untransmittable (U=U)</p>
+                <p class="yt-channel">SAHIV Society</p>
+                <p class="yt-meta">HIV &amp; AIDS · Beginner</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- HIV 3 -->
+          <div class="yt-card" data-cat="hiv">
+            <a href="https://www.youtube.com/watch?v=6wI0BNFEiF8" target="_blank" class="yt-thumb-wrap">
+              <img src="https://img.youtube.com/vi/6wI0BNFEiF8/hqdefault.jpg" alt="PrEP" class="yt-thumb" onerror="this.closest('.yt-thumb-wrap').classList.add('yt-thumb-fallback','yt-fallback-hiv');this.remove()">
+              <span class="yt-duration">7:32</span>
+              <span class="yt-play-btn"><i class="fa-solid fa-play"></i></span>
+            </a>
+            <div class="yt-info">
+              <span class="yt-cat-dot yt-dot-hiv"></span>
+              <div>
+                <p class="yt-title">PrEP — Pre-Exposure Prophylaxis for HIV Prevention</p>
+                <p class="yt-channel">DoH South Africa</p>
+                <p class="yt-meta">HIV &amp; AIDS · Intermediate</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Diabetes 1 -->
+          <div class="yt-card" data-cat="diabetes">
+            <a href="https://www.youtube.com/watch?v=vIDALT1fmfk" target="_blank" class="yt-thumb-wrap">
+              <img src="https://img.youtube.com/vi/vIDALT1fmfk/hqdefault.jpg" alt="Type 2 Diabetes" class="yt-thumb" onerror="this.closest('.yt-thumb-wrap').classList.add('yt-thumb-fallback','yt-fallback-diabetes');this.remove()">
+              <span class="yt-duration">8:32</span>
+              <span class="yt-play-btn"><i class="fa-solid fa-play"></i></span>
+            </a>
+            <div class="yt-info">
+              <span class="yt-cat-dot yt-dot-diabetes"></span>
+              <div>
+                <p class="yt-title">Type 2 Diabetes — Prevention, Diet &amp; Medication</p>
+                <p class="yt-channel">Diabetes SA</p>
+                <p class="yt-meta">Diabetes · Beginner</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Diabetes 2 -->
+          <div class="yt-card" data-cat="diabetes">
+            <a href="https://www.youtube.com/watch?v=YHE5sH20Hck" target="_blank" class="yt-thumb-wrap">
+              <img src="https://img.youtube.com/vi/YHE5sH20Hck/hqdefault.jpg" alt="Blood Sugar" class="yt-thumb" onerror="this.closest('.yt-thumb-wrap').classList.add('yt-thumb-fallback','yt-fallback-diabetes');this.remove()">
+              <span class="yt-duration">11:04</span>
+              <span class="yt-play-btn"><i class="fa-solid fa-play"></i></span>
+            </a>
+            <div class="yt-info">
+              <span class="yt-cat-dot yt-dot-diabetes"></span>
+              <div>
+                <p class="yt-title">Managing Blood Sugar at Home — Monitoring &amp; Lifestyle</p>
+                <p class="yt-channel">Diabetes SA</p>
+                <p class="yt-meta">Diabetes · Intermediate</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Mental 1 -->
+          <div class="yt-card" data-cat="mental">
+            <a href="https://www.youtube.com/watch?v=NeEe3bCFD-E" target="_blank" class="yt-thumb-wrap">
+              <img src="https://img.youtube.com/vi/NeEe3bCFD-E/hqdefault.jpg" alt="Mental Health SA" class="yt-thumb" onerror="this.closest('.yt-thumb-wrap').classList.add('yt-thumb-fallback','yt-fallback-mental');this.remove()">
+              <span class="yt-duration">18:11</span>
+              <span class="yt-play-btn"><i class="fa-solid fa-play"></i></span>
+            </a>
+            <div class="yt-info">
+              <span class="yt-cat-dot yt-dot-mental"></span>
+              <div>
+                <p class="yt-title">Mental Health in SA — Depression, Anxiety &amp; Getting Help</p>
+                <p class="yt-channel">SADAG</p>
+                <p class="yt-meta">Mental Health · Beginner</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Mental 2 -->
+          <div class="yt-card" data-cat="mental">
+            <a href="https://www.youtube.com/watch?v=RVA2XlIILp0" target="_blank" class="yt-thumb-wrap">
+              <img src="https://img.youtube.com/vi/RVA2XlIILp0/hqdefault.jpg" alt="Coping with Stress" class="yt-thumb" onerror="this.closest('.yt-thumb-wrap').classList.add('yt-thumb-fallback','yt-fallback-mental');this.remove()">
+              <span class="yt-duration">14:22</span>
+              <span class="yt-play-btn"><i class="fa-solid fa-play"></i></span>
+            </a>
+            <div class="yt-info">
+              <span class="yt-cat-dot yt-dot-mental"></span>
+              <div>
+                <p class="yt-title">Coping with Stress &amp; Trauma — Free Community Tools</p>
+                <p class="yt-channel">SADAG</p>
+                <p class="yt-meta">Mental Health · All levels</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Vaccine 1 -->
+          <div class="yt-card" data-cat="vaccine">
+            <a href="https://www.youtube.com/watch?v=Pb5HWJaVLvo" target="_blank" class="yt-thumb-wrap">
+              <img src="https://img.youtube.com/vi/Pb5HWJaVLvo/hqdefault.jpg" alt="Child Vaccines" class="yt-thumb" onerror="this.closest('.yt-thumb-wrap').classList.add('yt-thumb-fallback','yt-fallback-vaccine');this.remove()">
+              <span class="yt-duration">8:07</span>
+              <span class="yt-play-btn"><i class="fa-solid fa-play"></i></span>
+            </a>
+            <div class="yt-info">
+              <span class="yt-cat-dot yt-dot-vaccine"></span>
+              <div>
+                <p class="yt-title">SA Childhood Vaccination Schedule — What, When &amp; Why</p>
+                <p class="yt-channel">DoH South Africa</p>
+                <p class="yt-meta">Vaccines · Parents</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Vaccine 2 -->
+          <div class="yt-card" data-cat="vaccine">
+            <a href="https://www.youtube.com/watch?v=h3MVZs9SdZk" target="_blank" class="yt-thumb-wrap">
+              <img src="https://img.youtube.com/vi/h3MVZs9SdZk/hqdefault.jpg" alt="Flu Vaccine" class="yt-thumb" onerror="this.closest('.yt-thumb-wrap').classList.add('yt-thumb-fallback','yt-fallback-vaccine');this.remove()">
+              <span class="yt-duration">6:15</span>
+              <span class="yt-play-btn"><i class="fa-solid fa-play"></i></span>
+            </a>
+            <div class="yt-info">
+              <span class="yt-cat-dot yt-dot-vaccine"></span>
+              <div>
+                <p class="yt-title">Flu Season &amp; Pneumonia Shots — Who Needs Them?</p>
+                <p class="yt-channel">Thuso Health</p>
+                <p class="yt-meta">Vaccines · All levels</p>
+              </div>
+            </div>
+          </div>
+
+        </div><!-- /yt-grid -->
 
         <!-- Emergency numbers -->
-        <div class="card" style="margin-top:0.5rem;background:linear-gradient(135deg,#fff7ed,#fff);border-left:4px solid #f97316;">
+        <div class="card" style="margin-top:1.25rem;background:linear-gradient(135deg,#fff7ed,#fff);border-left:4px solid #f97316;">
           <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.75rem;">
             <i class="fa-solid fa-phone-volume" style="color:#f97316;font-size:1.1rem;"></i>
             <h4 style="margin:0;font-size:0.95rem;">Emergency &amp; Health Helplines</h4>
@@ -706,6 +774,16 @@
         </div>
 
       </div>
+
+      <script>
+        function filterEdu(btn, cat) {
+          document.querySelectorAll('.yt-chip').forEach(c => c.classList.remove('active'));
+          btn.classList.add('active');
+          document.querySelectorAll('#edu-grid .yt-card').forEach(card => {
+            card.style.display = (cat === 'all' || card.dataset.cat === cat) ? '' : 'none';
+          });
+        }
+      </script>
     </div><!-- /tab-education -->
 
   </main>

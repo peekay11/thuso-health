@@ -652,13 +652,13 @@ function showTab(name) {
   if (panel) panel.classList.add('tab-active');
 
   // Desktop nav active states
-  ['clinics', 'profile', 'education'].forEach(t => {
+  ['clinics', 'education', 'profile', 'settings'].forEach(t => {
     const el = document.getElementById('nav-' + t);
     if (el) el.classList.toggle('nav-link--active', t === name);
   });
 
   // Mobile tab bar active states
-  ['clinics', 'profile', 'education'].forEach(t => {
+  ['clinics', 'education', 'profile', 'settings'].forEach(t => {
     const el = document.getElementById('mob-tab-' + t);
     if (el) el.classList.toggle('mob-tab-active', t === name);
   });

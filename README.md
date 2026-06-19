@@ -1,44 +1,51 @@
-# Thuso Health — Digital Health Passport & Smart Clinic Booking
+# Thuso Health — Digital Health Passport & Smart Clinic Finder
 
-> **"Thuso"** is a Sesotho word meaning **"help"** or **"assistance"** — because everyone deserves access to their health records and a clinic that's ready for them.
+**"Thuso Health"** is an offline-first app that helps patients find the nearest, least crowded clinic and provides a Digital Health Passport — a secure medical ID card with a one-time PIN for instant access to diagnoses, treatments, and prescriptions. It also gives clinic staff a queue dashboard to manage patient flow.
+
 
 **Live demo:** [thuso-health.pages.dev](https://thuso-health.pages.dev)
 
----
 
-## The Problem — South Africa's Healthcare Documentation Crisis
+## Problem Statement
 
-South Africa's public health system serves over 84% of the population through government clinics — yet most of these facilities still rely on paper folders, handwritten scripts, and manual queues. The consequences are severe:
+Many patients struggle to choose the right clinic because they do not know which one is:
 
-- **Lost records** — A patient visiting a different clinic or province for the first time starts from scratch. A folder stays at one facility; the patient does not.
-- **Repeated diagnostics** — Without a shared history, doctors re-order blood tests and X-rays that were done weeks before at another clinic, wasting limited resources and the patient's time.
-- **No-shows cascade** — An unattended appointment locks a slot, extends waiting times for everyone else, and in chronic medication cases (ARVs, insulin) can mean dangerous gaps in treatment.
-- **Queue opacity** — Patients arrive at whichever clinic is nearest with no idea of current wait times, causing avoidable 3–5 hour queues at busy facilities while nearby clinics sit underutilised.
-- **Load-shedding disruptions** — Clinics on Eskom-affected schedules cannot confirm whether their systems are even on, leaving patients to travel only to find locked doors.
+- Closest to them
+- Least crowded
+- Most reliable in terms of power and operating conditions
+- Quickest to reach given travel time and queue delays
 
----
+This often leads to wasted time, long waits, and poor decision-making when people need urgent care.
 
-## The Digital Health Passport — Why a "Card"?
+In addition, patients frequently lose or forget their medical history, diagnosis, and treatment plans. When they arrive at a clinic, they cannot effectively communicate their recent health records to practitioners, leading to:
 
-Every South African carries a physical ID book or smart card. It is universally understood: one card, your identity, accepted everywhere.
-
-The **Digital Health Passport** uses that same mental model for healthcare:
-
-| Physical ID Card | Digital Health Passport |
-|---|---|
-| You carry it in your wallet | Stored securely on your phone |
-| Accepted at any government office | Accepted at any Thuso-enrolled clinic |
-| Contains your ID number | Contains your Thuso ID (TH-XXXXXX) |
-| Shown to the official | QR code scanned by the practitioner |
-| Fixed data (name, DOB) | Live medical timeline — diagnoses, prescriptions, treatment plans |
-
-When a patient presents at a new clinic, the practitioner enters the patient's **Thuso ID** or scans the QR code on the patient's phone. With the patient's one-time PIN consent, the doctor instantly sees the full visit history — across all facilities, in any language. No folder to fetch. No history to repeat. No guesswork.
-
-The card format (physical bank-card proportions, SA flag stripe, gold chip) was intentional: it signals **trust, permanence, and portability** — the same emotional weight as your bank card, applied to your health.
+- Repeated tests
+- Misdiagnosis
+- Treatment delays
+- Redundant paperwork
 
 ---
 
-## How Thuso Solves the G13 Health Challenge
+## Solution
+
+Thuso Health solves these challenges by delivering a dual-layered approach:
+
+### 1. Smart Clinic Navigation
+- Combines **travel time estimates**, **queue congestion information**, and **clinic power availability**
+- Guides patients to the most practical clinic for their situation
+- Works **offline** using a local database, ensuring reliability in areas with poor network coverage
+
+### 2. Digital Health Passport (Card)
+- Generates a portable, secure snapshot of a patient's critical medical data
+- Includes patient ID, recent diagnosis, treatment plan, and prescribed medication
+- Features a **One-Time Access PIN** for secure, temporary practitioner access
+- Works offline — no internet connection is required to view or share the card
+
+Together, these features reduce uncertainty, improve continuity of care, and help people reach a clinic that is both practical and efficient.
+
+
+
+## How Thuso Solves the G13 Health Challenge(IMPACT)
 
 The **Digital Pulse G13 challenge** asks builders to improve equitable access to quality healthcare for Gauteng residents, specifically addressing:
 
@@ -79,18 +86,18 @@ The **Digital Pulse G13 challenge** asks builders to improve equitable access to
 
 ```
 thuso-health/
-├── frontend/               # Cloudflare Pages — static, no build step
-│   ├── landing.html        # Marketing / entry page
-│   ├── index.html          # Patient portal (auth, queue, map, passport)
-│   ├── healthcare.html     # Doctor / clinic manager portal
-│   ├── app.js              # Single unified state engine (~2 800 lines)
-│   ├── style.css           # Premium design system (indigo + SA palette)
-│   ├── full_logo.png       # Thuso Health logo
-│   └── wrangler.toml       # Cloudflare Pages deploy config
+├── frontend/ # Cloudflare Pages — static, no build step
+│ ├── landing.html # Marketing / entry page
+│ ├── index.html # Patient portal (auth, queue, map, passport)
+│ ├── healthcare.html # Doctor / clinic manager portal
+│ ├── app.js # Single unified state engine (~2 800 lines)
+│ ├── style.css # Premium design system (indigo + SA palette)
+│ ├── full_logo.png # Thuso Health logo
+│ └── wrangler.toml # Cloudflare Pages deploy config
 │
-└── worker/                 # Cloudflare Worker — Hono API + D1 SQL
-    ├── src/index.ts        # Routes: auth, clinics, patients, records, consent
-    └── wrangler.toml       # D1 binding, JWT secret, KV namespace
+└── worker/ # Cloudflare Worker — Hono API + D1 SQL
+├── src/index.ts # Routes: auth, clinics, patients, records, consent
+└── wrangler.toml # D1 binding, JWT secret, KV namespace
 ```
 
 **Stack:** Cloudflare Pages (frontend) · Cloudflare Workers + Hono (API) · Cloudflare D1 (SQLite at the edge) · Cloudflare R2 (medical file attachments) · JWT authentication · jsPDF · Leaflet + OSRM · QRCode.js
@@ -119,10 +126,10 @@ npx wrangler deploy
 
 ```bash
 # Frontend (static server)
-cd frontend && npm run dev        # http://localhost:3000
+cd frontend && npm run dev # http://localhost:3000
 
 # Worker (local D1 + bindings)
-cd worker && npx wrangler dev     # http://localhost:8787
+cd worker && npx wrangler dev # http://localhost:8787
 ```
 
 ---
